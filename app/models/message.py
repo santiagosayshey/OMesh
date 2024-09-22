@@ -1,6 +1,4 @@
 import json
-import base64
-import os
 from ..utils.crypto import Crypto
 
 class Message:
@@ -12,7 +10,7 @@ class Message:
 
     def to_json(self):
         return json.dumps({
-            "type": self.message_type,
+            "type": "signed_data",
             "data": self.data,
             "counter": self.counter,
             "signature": self.signature
@@ -46,32 +44,14 @@ class Message:
         message_bytes = json.dumps(message_data).encode("utf-8")
         return Crypto.rsa_verify(message_bytes, self.signature, public_key)
 
+    def verify_counter(self, last_counter):
+        if self.counter is None or last_counter is None:
+            return False
+        return self.counter > last_counter
+
     @staticmethod
-    def create_chat_message(sender_private_key, recipient_public_keys, plaintext, counter):
-        # Generate a random AES key
-        aes_key = os.urandom(32)
-
-        # Encrypt the plaintext using AES
-        iv, ciphertext, tag = Crypto.aes_encrypt(plaintext.encode("utf-8"), aes_key)
-
-        # Encrypt the AES key with each recipient's public key
-        encrypted_keys = [Crypto.rsa_encrypt(aes_key, public_key) for public_key in recipient_public_keys]
-
-        data = {
-            "iv": base64.b64encode(iv).decode("utf-8"),
-            "ciphertext": base64.b64encode(ciphertext).decode("utf-8"),
-            "tag": base64.b64encode(tag).decode("utf-8"),
-            "encrypted_keys": encrypted_keys
-        }
-
-        message = Message(message_type="chat", data=data, counter=counter)
-        message.sign(sender_private_key)
+    def create_message(message_type, data, counter=None, private_key=None):
+        message = Message(message_type=message_type, data=data, counter=counter)
+        if private_key:
+            message.sign(private_key)
         return message
-
-    @staticmethod
-    def create_public_chat_message(sender_public_key, plaintext):
-        data = {
-            "sender": Crypto.export_public_key(sender_public_key),
-            "message": plaintext
-        }
-        return Message(message_type="public_chat", data=data)
