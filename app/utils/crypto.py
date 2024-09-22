@@ -5,6 +5,8 @@ import os
 import base64
 
 class Crypto:
+    AES_KEY_LENGTH = 32  # 256 bits
+
     @staticmethod
     def generate_rsa_key_pair():
         private_key = rsa.generate_private_key(
@@ -52,7 +54,7 @@ class Crypto:
             message,
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=32
+                salt_length=32  # As per the protocol specification
             ),
             hashes.SHA256()
         )
@@ -76,6 +78,8 @@ class Crypto:
 
     @staticmethod
     def aes_encrypt(message, key):
+        if len(key) != Crypto.AES_KEY_LENGTH:
+            raise ValueError(f"AES key must be {Crypto.AES_KEY_LENGTH} bytes long")
         iv = os.urandom(16)
         cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
         encryptor = cipher.encryptor()
@@ -83,11 +87,17 @@ class Crypto:
         return iv, ciphertext, encryptor.tag
 
     @staticmethod
-    def aes_decrypt(encrypted_message, key):
-        data = base64.b64decode(encrypted_message)
-        iv = data[:16]
-        tag = data[16:32]
-        ciphertext = data[32:]
+    def aes_decrypt(iv, ciphertext, tag, key):
+        if len(key) != Crypto.AES_KEY_LENGTH:
+            raise ValueError(f"AES key must be {Crypto.AES_KEY_LENGTH} bytes long")
         cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag))
         decryptor = cipher.decryptor()
         return decryptor.update(ciphertext) + decryptor.finalize()
+
+    @staticmethod
+    def generate_fingerprint(public_key):
+        key_bytes = public_key.public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        return base64.b64encode(hashes.Hash(hashes.SHA256()).update(key_bytes).finalize()).decode('utf-8')
