@@ -1,5 +1,5 @@
 import json
-from uuid import uuid4
+import base64
 import os
 from ..utils.crypto import Crypto
 
@@ -52,7 +52,7 @@ class Message:
         aes_key = os.urandom(32)
 
         # Encrypt the plaintext using AES
-        iv, ciphertext = Crypto.aes_encrypt(plaintext.encode("utf-8"), aes_key)
+        iv, ciphertext, tag = Crypto.aes_encrypt(plaintext.encode("utf-8"), aes_key)
 
         # Encrypt the AES key with each recipient's public key
         encrypted_keys = [Crypto.rsa_encrypt(aes_key, public_key) for public_key in recipient_public_keys]
@@ -60,6 +60,7 @@ class Message:
         data = {
             "iv": base64.b64encode(iv).decode("utf-8"),
             "ciphertext": base64.b64encode(ciphertext).decode("utf-8"),
+            "tag": base64.b64encode(tag).decode("utf-8"),
             "encrypted_keys": encrypted_keys
         }
 

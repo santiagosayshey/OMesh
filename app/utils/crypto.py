@@ -80,7 +80,7 @@ class Crypto:
         cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
         encryptor = cipher.encryptor()
         ciphertext = encryptor.update(message) + encryptor.finalize()
-        return base64.b64encode(iv + encryptor.tag + ciphertext).decode('utf-8')
+        return iv, ciphertext, encryptor.tag
 
     @staticmethod
     def aes_decrypt(encrypted_message, key):
