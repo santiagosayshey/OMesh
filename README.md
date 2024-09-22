@@ -17,7 +17,7 @@ This project implements the OLAF/Neighbourhood protocol for secure, decentralize
 omesh/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py
+│   ├── app.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── user.py
