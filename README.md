@@ -66,10 +66,10 @@ To run the tests for this project:
 1. Build the Docker image (if you haven't already):
 
    ```
-   docker build -t omesh .
+   docker compose build
    ```
 
 2. Run the tests using the following command:
    ```
-   docker run --rm omesh pytest /app/tests/<test>.py
+   docker-compose run omesh pytest -v --capture=no app/tests/test_<test>.py
    ```
