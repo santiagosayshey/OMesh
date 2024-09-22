@@ -58,3 +58,18 @@ omesh/
    ```
    docker-compose down
    ```
+
+## Running Tests
+
+To run the tests for this project:
+
+1. Build the Docker image (if you haven't already):
+
+   ```
+   docker build -t omesh .
+   ```
+
+2. Run the tests using the following command:
+   ```
+   docker run --rm omesh pytest /app/tests/<test>.py
+   ```
