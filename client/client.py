@@ -71,28 +71,20 @@ class Client:
         threading.Thread(target=self.run_flask_app).start()
 
         # Start asyncio event loop for WebSocket connection
-        self.loop.run_until_complete(self.connect_to_server())
+        self.loop.create_task(self.connect_to_server())
+        self.loop.run_forever()
+
 
     def load_or_generate_keys(self):
-        # Check if keys exist
-        if os.path.exists('private_key.pem') and os.path.exists('public_key.pem'):
-            # Load keys from files
-            with open('private_key.pem', 'rb') as f:
-                private_pem = f.read()
-            self.private_key = load_private_key(private_pem)
-            with open('public_key.pem', 'rb') as f:
-                public_pem = f.read()
-            self.public_key = load_public_key(public_pem)
-        else:
-            # Generate new key pair
-            self.private_key, self.public_key = generate_rsa_key_pair()
-            # Save keys to files
-            private_pem = export_private_key(self.private_key)
-            with open('private_key.pem', 'wb') as f:
-                f.write(private_pem)
-            public_pem = export_public_key(self.public_key)
-            with open('public_key.pem', 'wb') as f:
-                f.write(public_pem)
+        # Always generate new key pair
+        self.private_key, self.public_key = generate_rsa_key_pair()
+        # Save keys to files
+        private_pem = export_private_key(self.private_key)
+        with open('private_key.pem', 'wb') as f:
+            f.write(private_pem)
+        public_pem = export_public_key(self.public_key)
+        with open('public_key.pem', 'wb') as f:
+            f.write(public_pem)
 
     async def connect_to_server(self):
         try:
