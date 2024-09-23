@@ -206,9 +206,6 @@ class Server:
             print("Received message without 'type'")
             return
 
-        data = message_dict.get('data', {})
-        message_type = data.get('type')
-
         if message_type == 'hello':
             # Handle 'hello' message
             pass  # Already handled in the connection function
