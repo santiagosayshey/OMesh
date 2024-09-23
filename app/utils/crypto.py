@@ -84,15 +84,20 @@ class Crypto:
         cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
         encryptor = cipher.encryptor()
         ciphertext = encryptor.update(message) + encryptor.finalize()
-        return iv, ciphertext, encryptor.tag
+        ciphertext_with_tag = ciphertext + encryptor.tag
+        return iv, ciphertext_with_tag
 
     @staticmethod
-    def aes_decrypt(iv, ciphertext, tag, key):
+    def aes_decrypt(iv, ciphertext_with_tag, key):
         if len(key) != Crypto.AES_KEY_LENGTH:
             raise ValueError(f"AES key must be {Crypto.AES_KEY_LENGTH} bytes long")
-        cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag))
+        cipher = Cipher(algorithms.AES(key), modes.GCM(iv))
         decryptor = cipher.decryptor()
-        return decryptor.update(ciphertext) + decryptor.finalize()
+        ciphertext = ciphertext_with_tag[:-16]
+        tag = ciphertext_with_tag[-16:]
+        decrypted_data = decryptor.update(ciphertext) + decryptor.finalize_with_tag(tag)
+        return decrypted_data
+
 
     @staticmethod
     def generate_fingerprint(public_key):

@@ -40,8 +40,8 @@ def test_aes_encrypt_decrypt():
     print("Testing AES encryption and decryption...")
     key = b"0" * 32  # 256-bit key
     message = b"Hello, World!"
-    iv, ciphertext, tag = Crypto.aes_encrypt(message, key)
-    print(f"Encrypted AES message: (iv: {iv}, ciphertext: {ciphertext}, tag: {tag})")
-    decrypted = Crypto.aes_decrypt(iv, ciphertext, tag, key)
+    iv, ciphertext_with_tag = Crypto.aes_encrypt(message, key)
+    print(f"Encrypted AES message: (iv: {iv}, ciphertext_with_tag: {ciphertext_with_tag})")
+    decrypted = Crypto.aes_decrypt(iv, ciphertext_with_tag, key)
     print(f"Decrypted AES message: {decrypted}")
     assert decrypted == message

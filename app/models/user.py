@@ -2,6 +2,7 @@ from app.utils.crypto import Crypto
 from app.models.message import Message
 import json
 import base64
+import os
 
 class User:
     def __init__(self):
@@ -23,26 +24,22 @@ class User:
 
     def create_chat_message(self, recipients, destination_servers, plaintext):
         self.counter += 1
-        aes_key = Crypto.AES_KEY_LENGTH * b"x"  # Replace with secure random key generation
-        iv, ciphertext, tag = Crypto.aes_encrypt(plaintext.encode("utf-8"), aes_key)
-
-        encrypted_keys = [Crypto.rsa_encrypt(aes_key, recipient.public_key) for recipient in recipients]
-
+        aes_key = os.urandom(Crypto.AES_KEY_LENGTH)  # Generate a secure random AES key
         chat_content = {
             "participants": [self.fingerprint] + [recipient.fingerprint for recipient in recipients],
             "message": plaintext
         }
-        encrypted_chat = Crypto.aes_encrypt(json.dumps(chat_content).encode("utf-8"), aes_key)
-
+        iv, ciphertext, tag = Crypto.aes_encrypt(json.dumps(chat_content).encode("utf-8"), aes_key)
+        encrypted_keys = [Crypto.rsa_encrypt(aes_key, recipient.public_key) for recipient in recipients]
         data = {
             "type": "chat",
             "destination_servers": destination_servers,
             "iv": base64.b64encode(iv).decode("utf-8"),
             "symm_keys": encrypted_keys,
-            "chat": base64.b64encode(encrypted_chat[1]).decode("utf-8")
+            "chat": base64.b64encode(ciphertext).decode("utf-8")
         }
-
         return Message.create_message("chat", data, self.counter, self.private_key)
+
 
     def create_public_chat_message(self, plaintext):
         self.counter += 1
