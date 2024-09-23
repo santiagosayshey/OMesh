@@ -2,9 +2,15 @@
 
 import json
 import base64
+from common.crypto import (
+    generate_aes_key,
+    generate_iv,
+    encrypt_aes_gcm,
+    encrypt_rsa_oaep,
+    calculate_fingerprint
+)
 from enum import Enum
 from collections import defaultdict
-from common.crypto import sign_data, verify_signature, calculate_fingerprint
 from cryptography.hazmat.primitives import serialization
 
 # Enum for message types
@@ -130,81 +136,57 @@ def build_hello_message(public_key):
 
 
 # Function to construct a 'chat' message
-def build_chat_message(destination_servers, recipients_public_keys, sender_private_key, sender_counter, message_text):
-    """
-    Constructs an encrypted 'chat' message according to the protocol.
-    - destination_servers: List of recipient server addresses.
-    - recipients_public_keys: List of recipient public keys.
-    - sender_private_key: Sender's RSA private key.
-    - sender_counter: Sender's message counter.
-    - message_text: Plaintext message to send.
-    """
-    from common.crypto import generate_aes_key, generate_iv, encrypt_aes_gcm, encrypt_rsa_oaep, calculate_fingerprint
-
+def build_chat_message(destination_servers, recipients_public_keys, sender_private_key, message_text):
     # Generate AES key and IV
     aes_key = generate_aes_key()
     iv = generate_iv()
     iv_b64 = base64.b64encode(iv).decode('utf-8')
 
-    # Encrypt the message with AES-GCM
-    plaintext_bytes = message_text.encode('utf-8')
-    ciphertext, tag = encrypt_aes_gcm(plaintext_bytes, aes_key, iv)
-    cipher_b64 = base64.b64encode(ciphertext + tag).decode('utf-8')  # Append tag to ciphertext
+    # Prepare the chat data
+    sender_public_key = sender_private_key.public_key()
+    sender_fingerprint = calculate_fingerprint(sender_public_key)
+    participants = [sender_fingerprint] + [calculate_fingerprint(pk) for pk in recipients_public_keys]
+    
+    chat_data = {
+        "participants": participants,
+        "message": message_text
+    }
+    chat_json = json.dumps(chat_data)
 
-    # Encrypt AES key with recipients' public keys
+    # Encrypt the chat data
+    ciphertext, tag = encrypt_aes_gcm(chat_json.encode('utf-8'), aes_key, iv)
+    chat_b64 = base64.b64encode(ciphertext + tag).decode('utf-8')
+
+    # Encrypt AES key for each recipient
     symm_keys = []
-    participants = []
-    destination_servers_list = []
     for public_key in recipients_public_keys:
         encrypted_key = encrypt_rsa_oaep(aes_key, public_key)
         encrypted_key_b64 = base64.b64encode(encrypted_key).decode('utf-8')
         symm_keys.append(encrypted_key_b64)
-        # Calculate fingerprint
-        fingerprint = calculate_fingerprint(public_key)
-        participants.append(fingerprint)
 
-    # Add sender's own fingerprint at the beginning
-    sender_public_key = sender_private_key.public_key()
-    sender_fingerprint = calculate_fingerprint(sender_public_key)
-    participants.insert(0, sender_fingerprint)
-
-    # Prepare the 'chat' data
-    chat_data = {
-        "participants": participants,
-        "message": message_text  # Plaintext message is included in the encrypted 'chat' field
+    # Construct the message
+    message = {
+        "data": {
+            "type": "chat",
+            "destination_servers": destination_servers,
+            "iv": iv_b64,
+            "symm_keys": symm_keys,
+            "chat": chat_b64
+        }
     }
 
-    # Serialize 'chat' data
-    chat_json = json.dumps(chat_data, separators=(',', ':'), sort_keys=True)
-    # Note: In the protocol, the 'chat' field is supposed to be encrypted.
-
-    # Build the 'data' field
-    data_dict = {
-        "type": MessageType.CHAT.value,
-        "destination_servers": destination_servers,
-        "iv": iv_b64,
-        "symm_keys": symm_keys,
-        "chat": cipher_b64
-    }
-
-    # Build the signed message
-    message = build_signed_message(data_dict, sender_private_key, sender_counter)
     return message
 
+
 # Function to construct a 'public_chat' message
-def build_public_chat_message(sender_fingerprint, message_text):
-    """
-    Constructs a 'public_chat' message.
-    - sender_fingerprint: Base64 encoded fingerprint of the sender.
-    - message_text: Plaintext message to send.
-    """
-    data_dict = {
-        "type": MessageType.PUBLIC_CHAT.value,
-        "sender": sender_fingerprint,
-        "message": message_text
-    }
+def build_public_chat_message(sender_public_key, message_text):
+    sender_fingerprint = calculate_fingerprint(sender_public_key)
     message = {
-        "data": data_dict
+        "data": {
+            "type": "public_chat",
+            "sender": sender_fingerprint,
+            "message": message_text
+        }
     }
     return message
 

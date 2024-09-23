@@ -1,5 +1,3 @@
-<!-- client/templates/index.html -->
-
 <!DOCTYPE html>
 <html>
   <head>
@@ -15,6 +13,9 @@
       <button id="request-client-list">Request Client List</button>
     </div>
 
+    <h2>Your Fingerprint</h2>
+    <p id="user-fingerprint">Loading...</p>
+
     <h2>Online Clients</h2>
     <ul id="client-list"></ul>
 
@@ -29,6 +30,8 @@
     <ul id="message-list"></ul>
 
     <script>
+      let userFingerprint = "";
+
       function refreshClients() {
         console.log("Refreshing clients...");
         $.getJSON("/get_clients")
@@ -38,7 +41,9 @@
             var clientList = $("#client-list");
             clientList.empty();
             clients.forEach(function (fingerprint) {
-              clientList.append("<li>" + fingerprint + "</li>");
+              if (fingerprint !== userFingerprint) {
+                clientList.append("<li>" + fingerprint + "</li>");
+              }
             });
           })
           .fail(function (jqXHR, textStatus, errorThrown) {
@@ -56,7 +61,7 @@
             messages.forEach(function (msg) {
               messageList.append(
                 "<li><strong>" +
-                  msg.sender +
+                  (msg.sender === userFingerprint ? "You" : msg.sender) +
                   ":</strong> " +
                   msg.message +
                   "</li>"
@@ -73,6 +78,20 @@
       }
 
       $(document).ready(function () {
+        // Get user's fingerprint
+        $.getJSON("/get_fingerprint")
+          .done(function (data) {
+            userFingerprint = data.fingerprint;
+            $("#user-fingerprint").text(userFingerprint);
+          })
+          .fail(function (jqXHR, textStatus, errorThrown) {
+            console.error(
+              "Error getting fingerprint:",
+              textStatus,
+              errorThrown
+            );
+          });
+
         $("#refresh-clients").click(refreshClients);
         $("#refresh-messages").click(refreshMessages);
 

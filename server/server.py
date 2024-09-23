@@ -288,18 +288,13 @@ class Server:
 
     async def send_client_list(self, websocket):
         logger.debug(f"Preparing client list. Known clients: {list(self.client_public_keys.keys())}")
-        servers = []
-        server_entry = {
+        servers = [{
             "address": self.address,
-            "clients": []
-        }
-        for fingerprint, public_key in self.client_public_keys.items():
-            public_pem = export_public_key(public_key)
-            public_key_b64 = base64.b64encode(public_pem).decode('utf-8')
-            server_entry["clients"].append(public_key_b64)
-            logger.debug(f"Added client with fingerprint {fingerprint} to client list")
-
-        servers.append(server_entry)
+            "clients": [
+                base64.b64encode(export_public_key(public_key)).decode('utf-8')
+                for public_key in self.client_public_keys.values()
+            ]
+        }]
 
         client_list_message = {
             "type": "client_list",

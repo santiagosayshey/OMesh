@@ -1,6 +1,7 @@
 # client/client.py
 
 import asyncio
+import json
 import websockets
 import json
 import threading
@@ -150,26 +151,9 @@ class Client:
                     fingerprint = calculate_fingerprint(public_key)
                     self.known_clients[fingerprint] = public_key
             print("Updated client list")
-        elif message_type == 'signed_data':
-            # Verify signed message
-            sender_fingerprint = data.get('participants', [])[0]
-            sender_public_key = self.known_clients.get(sender_fingerprint)
-            if not sender_public_key:
-                print(f"Unknown sender: {sender_fingerprint}")
-                return
-
-            last_counter = self.last_counters.get(sender_fingerprint, 0)
-            is_valid, error = verify_signed_message(message_dict, sender_public_key, last_counter)
-            if not is_valid:
-                print(f"Invalid message from {sender_fingerprint}: {error}")
-                return
-
-            # Update last counter
-            counter = message_dict.get('counter')
-            self.last_counters[sender_fingerprint] = counter
-
-            # Decrypt message if intended for this client
-            await self.decrypt_and_store_message(data, sender_fingerprint)
+        elif message_type == 'chat':
+            # Handle chat message
+            await self.decrypt_and_store_message(data)
         elif message_type == 'public_chat':
             # Handle public chat message
             sender_fingerprint = data.get('sender')
@@ -181,41 +165,45 @@ class Client:
         else:
             print(f"Unknown message type: {message_type}")
 
-    async def decrypt_and_store_message(self, data, sender_fingerprint):
+    async def decrypt_and_store_message(self, data):
         symm_keys_b64 = data.get('symm_keys', [])
         iv_b64 = data.get('iv')
         chat_b64 = data.get('chat')
 
+        if not all([symm_keys_b64, iv_b64, chat_b64]):
+            print("Missing required fields in chat message")
+            return
+
         # Try to decrypt the symmetric key
         private_key = self.private_key
+        my_fingerprint = calculate_fingerprint(self.public_key)
 
-        for idx, recipient_fingerprint in enumerate(data.get('participants', [])[1:]):
-            if recipient_fingerprint == calculate_fingerprint(self.public_key):
-                symm_key_b64 = symm_keys_b64[idx]
-                symm_key_encrypted = base64.b64decode(symm_key_b64.encode('utf-8'))
-                try:
-                    symm_key = decrypt_rsa_oaep(symm_key_encrypted, private_key)
-                except Exception as e:
-                    print(f"Failed to decrypt symmetric key: {e}")
-                    return
+        # Decrypt the chat data first
+        iv = base64.b64decode(iv_b64.encode('utf-8'))
+        cipher_and_tag = base64.b64decode(chat_b64.encode('utf-8'))
+        ciphertext = cipher_and_tag[:-16]
+        tag = cipher_and_tag[-16:]
 
-                # Decrypt the message
-                iv = base64.b64decode(iv_b64.encode('utf-8'))
-                cipher_and_tag = base64.b64decode(chat_b64.encode('utf-8'))
-                ciphertext = cipher_and_tag[:-16]
-                tag = cipher_and_tag[-16:]
-
-                try:
-                    plaintext_bytes = decrypt_aes_gcm(ciphertext, symm_key, iv, tag)
-                    message_text = plaintext_bytes.decode('utf-8')
+        for idx, symm_key_b64 in enumerate(symm_keys_b64):
+            symm_key_encrypted = base64.b64decode(symm_key_b64.encode('utf-8'))
+            try:
+                symm_key = decrypt_rsa_oaep(symm_key_encrypted, private_key)
+                plaintext_bytes = decrypt_aes_gcm(ciphertext, symm_key, iv, tag)
+                chat_data = json.loads(plaintext_bytes.decode('utf-8'))
+                
+                participants = chat_data.get('participants', [])
+                if my_fingerprint in participants:
+                    sender_fingerprint = participants[0]
+                    message_text = chat_data['message']
                     self.incoming_messages.append({
                         'sender': sender_fingerprint,
                         'message': message_text
                     })
                     print(f"Received message from {sender_fingerprint}: {message_text}")
-                except Exception as e:
-                    print(f"Failed to decrypt message: {e}")
-                return  # Message has been processed
+                    return
+            except Exception as e:
+                print(f"Failed to decrypt message with key {idx}: {e}")
+
         print("Message not intended for this client")
 
     def run_flask_app(self):
@@ -267,28 +255,20 @@ class Client:
             client_instance.loop
         )
         return jsonify({'status': 'Client list requested'})
+    
+    @app.route('/get_fingerprint', methods=['GET'])
+    def get_fingerprint():
+        fingerprint = calculate_fingerprint(client_instance.public_key)
+        return jsonify({'fingerprint': fingerprint})
 
     async def send_chat_message(self, recipients, message_text):
-        # Prepare recipients' public keys
-        recipients_public_keys = []
+        recipients_public_keys = [self.known_clients[fingerprint] for fingerprint in recipients if fingerprint in self.known_clients]
         destination_servers = [self.server_address]  # Assuming all recipients are on the same server
-        for fingerprint in recipients:
-            public_key = self.known_clients.get(fingerprint)
-            if public_key:
-                recipients_public_keys.append(public_key)
-            else:
-                print(f"Unknown recipient: {fingerprint}")
-                return
 
-        # Increment counter
-        self.counter += 1
-
-        # Build and send chat message
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
             self.private_key,
-            self.counter,
             message_text
         )
         message_json = json.dumps(message)
@@ -296,22 +276,15 @@ class Client:
         print(f"Sent message to {recipients}")
 
     async def send_public_chat(self, message_text):
-        # Build and send public chat message
-        sender_fingerprint = calculate_fingerprint(self.public_key)
-        data_dict = {
-            "type": "public_chat",
-            "sender": sender_fingerprint,
-            "message": message_text
-        }
-        message = {
-            "data": data_dict
-        }
+        message = build_public_chat_message(self.public_key, message_text)
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         print("Sent public message")
-
+    
     async def request_client_list(self):
-        message = build_client_list_request()
+        message = {
+            "type": "client_list_request"
+        }
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         logger.info("Requested client list")
