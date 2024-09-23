@@ -1,0 +1,203 @@
+# docker-compose.yml
+
+version: "3.8"
+
+services:
+  server1:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server1
+    ports:
+      - "8765:8765" # WebSocket port for clients
+      - "8766:8766" # WebSocket port for servers
+      - "8081:8081" # HTTP port for file transfers
+    volumes:
+      - ./server/clients:/app/server/clients
+      - ./server/files:/app/server/files
+    environment:
+      - SERVER_ADDRESS=server1
+      - SERVER_PORT=8765
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=server2:8765,server3:8765
+    networks:
+      - olaf_network
+
+  server2:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server2
+    ports:
+      - "8767:8765"
+      - "8768:8766"
+      - "8082:8081"
+    volumes:
+      - ./server/clients:/app/server/clients2
+      - ./server/files:/app/server/files2
+    environment:
+      - SERVER_ADDRESS=server2
+      - SERVER_PORT=8765
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=server1:8765,server3:8765
+    networks:
+      - olaf_network
+
+  server3:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server3
+    ports:
+      - "8769:8765"
+      - "8770:8766"
+      - "8083:8081"
+    volumes:
+      - ./server/clients:/app/server/clients3
+      - ./server/files:/app/server/files3
+    environment:
+      - SERVER_ADDRESS=server3
+      - SERVER_PORT=8765
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=server1:8765,server2:8765
+    networks:
+      - olaf_network
+
+  client1:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client1
+    ports:
+      - "5001:5000"
+    environment:
+      - SERVER_ADDRESS=server1
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server1
+
+  client2:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client2
+    ports:
+      - "5002:5000"
+    environment:
+      - SERVER_ADDRESS=server1
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server1
+
+  client3:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client3
+    ports:
+      - "5003:5000"
+    environment:
+      - SERVER_ADDRESS=server1
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server1
+
+  client4:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client4
+    ports:
+      - "5004:5000"
+    environment:
+      - SERVER_ADDRESS=server2
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server2
+
+  client5:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client5
+    ports:
+      - "5006:5000"
+    environment:
+      - SERVER_ADDRESS=server2
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server2
+
+  client6:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client6
+    ports:
+      - "5007:5000"
+    environment:
+      - SERVER_ADDRESS=server2
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server2
+
+  client7:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client7
+    ports:
+      - "5008:5000"
+    environment:
+      - SERVER_ADDRESS=server3
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server3
+
+  client8:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client8
+    ports:
+      - "5009:5000"
+    environment:
+      - SERVER_ADDRESS=server3
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server3
+
+  client9:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client9
+    ports:
+      - "5010:5000"
+    environment:
+      - SERVER_ADDRESS=server3
+      - SERVER_PORT=8765
+    networks:
+      - olaf_network
+    depends_on:
+      - server3
+
+networks:
+  olaf_network:
+    driver: bridge

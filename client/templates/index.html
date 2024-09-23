@@ -1,0 +1,102 @@
+<!-- client/templates/index.html -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OLAF Chat Client</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+  <body>
+    <h1>OLAF Chat Client</h1>
+
+    <div>
+      <button id="refresh-clients">Refresh Client List</button>
+      <button id="refresh-messages">Refresh Messages</button>
+      <button id="request-client-list">Request Client List</button>
+    </div>
+
+    <h2>Online Clients</h2>
+    <ul id="client-list"></ul>
+
+    <h2>Send Message</h2>
+    <textarea id="message-text" rows="4" cols="50"></textarea><br />
+    <label>Recipients (comma-separated fingerprints):</label><br />
+    <input type="text" id="recipients" /><br />
+    <button id="send-message">Send Private Message</button>
+    <button id="send-public-message">Send Public Message</button>
+
+    <h2>Messages</h2>
+    <ul id="message-list"></ul>
+
+    <script>
+      function refreshClients() {
+        $.getJSON("/get_clients", function (data) {
+          var clients = data.clients;
+          var clientList = $("#client-list");
+          clientList.empty();
+          clients.forEach(function (fingerprint) {
+            clientList.append("<li>" + fingerprint + "</li>");
+          });
+        });
+      }
+
+      function refreshMessages() {
+        $.getJSON("/get_messages", function (data) {
+          var messages = data.messages;
+          var messageList = $("#message-list");
+          messages.forEach(function (msg) {
+            messageList.append(
+              "<li><strong>" +
+                msg.sender +
+                ":</strong> " +
+                msg.message +
+                "</li>"
+            );
+          });
+        });
+      }
+
+      $(document).ready(function () {
+        $("#refresh-clients").click(refreshClients);
+        $("#refresh-messages").click(refreshMessages);
+        $("#request-client-list").click(function () {
+          $.get("/request_client_list", function (data) {
+            alert(data.status);
+          });
+        });
+
+        $("#send-message").click(function () {
+          var message = $("#message-text").val();
+          var recipients = $("#recipients")
+            .val()
+            .split(",")
+            .map(function (s) {
+              return s.trim();
+            });
+          $.ajax({
+            url: "/send_message",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ message: message, recipients: recipients }),
+            success: function (data) {
+              alert(data.status);
+            },
+          });
+        });
+
+        $("#send-public-message").click(function () {
+          var message = $("#message-text").val();
+          $.ajax({
+            url: "/send_public_message",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ message: message }),
+            success: function (data) {
+              alert(data.status);
+            },
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
