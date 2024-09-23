@@ -1,8 +1,0 @@
-version: "3"
-services:
-  omesh:
-    build: .
-    ports:
-      - "5995:5995"
-    volumes:
-      - .:/app
