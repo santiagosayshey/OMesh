@@ -29,7 +29,7 @@ class User:
             "participants": [self.fingerprint] + [recipient.fingerprint for recipient in recipients],
             "message": plaintext
         }
-        iv, ciphertext, tag = Crypto.aes_encrypt(json.dumps(chat_content).encode("utf-8"), aes_key)
+        iv, ciphertext = Crypto.aes_encrypt(json.dumps(chat_content).encode("utf-8"), aes_key)
         encrypted_keys = [Crypto.rsa_encrypt(aes_key, recipient.public_key) for recipient in recipients]
         data = {
             "type": "chat",
