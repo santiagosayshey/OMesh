@@ -30,39 +30,68 @@
 
     <script>
       function refreshClients() {
-        $.getJSON("/get_clients", function (data) {
-          var clients = data.clients;
-          var clientList = $("#client-list");
-          clientList.empty();
-          clients.forEach(function (fingerprint) {
-            clientList.append("<li>" + fingerprint + "</li>");
+        console.log("Refreshing clients...");
+        $.getJSON("/get_clients")
+          .done(function (data) {
+            console.log("Received client data:", data);
+            var clients = data.clients;
+            var clientList = $("#client-list");
+            clientList.empty();
+            clients.forEach(function (fingerprint) {
+              clientList.append("<li>" + fingerprint + "</li>");
+            });
+          })
+          .fail(function (jqXHR, textStatus, errorThrown) {
+            console.error("Error refreshing clients:", textStatus, errorThrown);
           });
-        });
       }
 
       function refreshMessages() {
-        $.getJSON("/get_messages", function (data) {
-          var messages = data.messages;
-          var messageList = $("#message-list");
-          messages.forEach(function (msg) {
-            messageList.append(
-              "<li><strong>" +
-                msg.sender +
-                ":</strong> " +
-                msg.message +
-                "</li>"
+        console.log("Refreshing messages...");
+        $.getJSON("/get_messages")
+          .done(function (data) {
+            console.log("Received message data:", data);
+            var messages = data.messages;
+            var messageList = $("#message-list");
+            messages.forEach(function (msg) {
+              messageList.append(
+                "<li><strong>" +
+                  msg.sender +
+                  ":</strong> " +
+                  msg.message +
+                  "</li>"
+              );
+            });
+          })
+          .fail(function (jqXHR, textStatus, errorThrown) {
+            console.error(
+              "Error refreshing messages:",
+              textStatus,
+              errorThrown
             );
           });
-        });
       }
 
       $(document).ready(function () {
         $("#refresh-clients").click(refreshClients);
         $("#refresh-messages").click(refreshMessages);
+
         $("#request-client-list").click(function () {
-          $.get("/request_client_list", function (data) {
-            alert(data.status);
-          });
+          console.log("Requesting client list...");
+          $.get("/request_client_list")
+            .done(function (data) {
+              console.log("Client list request response:", data);
+              alert(data.status);
+              // Automatically refresh the client list after requesting
+              refreshClients();
+            })
+            .fail(function (jqXHR, textStatus, errorThrown) {
+              console.error(
+                "Error requesting client list:",
+                textStatus,
+                errorThrown
+              );
+            });
         });
 
         $("#send-message").click(function () {
@@ -73,29 +102,51 @@
             .map(function (s) {
               return s.trim();
             });
+          console.log(
+            "Sending private message:",
+            message,
+            "to recipients:",
+            recipients
+          );
           $.ajax({
             url: "/send_message",
             method: "POST",
             contentType: "application/json",
             data: JSON.stringify({ message: message, recipients: recipients }),
             success: function (data) {
+              console.log("Message sent response:", data);
               alert(data.status);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              console.error("Error sending message:", textStatus, errorThrown);
             },
           });
         });
 
         $("#send-public-message").click(function () {
           var message = $("#message-text").val();
+          console.log("Sending public message:", message);
           $.ajax({
             url: "/send_public_message",
             method: "POST",
             contentType: "application/json",
             data: JSON.stringify({ message: message }),
             success: function (data) {
+              console.log("Public message sent response:", data);
               alert(data.status);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              console.error(
+                "Error sending public message:",
+                textStatus,
+                errorThrown
+              );
             },
           });
         });
+
+        // Initial client list refresh
+        refreshClients();
       });
     </script>
   </body>

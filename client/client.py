@@ -10,6 +10,11 @@ import os
 from flask import Flask, render_template, request, jsonify
 from flask_sock import Sock
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 from common.crypto import (
     generate_rsa_key_pair,
     load_public_key,
@@ -233,6 +238,7 @@ class Client:
     @app.route('/get_clients', methods=['GET'])
     def get_clients():
         fingerprints = list(client_instance.known_clients.keys())
+        logger.debug(f"Sending client list: {fingerprints}")
         return jsonify({'clients': fingerprints})
 
     @app.route('/send_message', methods=['POST'])
@@ -313,11 +319,10 @@ class Client:
         print("Sent public message")
 
     async def request_client_list(self):
-        # Build and send client list request
         message = build_client_list_request()
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
-        print("Requested client list")
+        logger.info("Requested client list")
 
 # Create an instance of the Client
 client_instance = Client()

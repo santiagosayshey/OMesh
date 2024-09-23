@@ -8,6 +8,11 @@ from aiohttp import web
 import base64
 import os
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 from common.protocol import (
     parse_message,
     validate_message_format,
@@ -211,7 +216,7 @@ class Server:
             # Forward message to destination servers or clients
             await self.forward_message(message_dict)
         elif message_type == 'client_list_request':
-            # Send client list
+            logger.debug("Received client list request")
             await self.send_client_list(websocket)
         else:
             print(f"Unknown message type from client: {message_type}")
@@ -285,29 +290,30 @@ class Server:
                 print(f"Error delivering message to client: {e}")
 
     async def send_client_list(self, websocket):
-        # Prepare the client list
+        logger.debug(f"Preparing client list. Known clients: {list(self.client_public_keys.keys())}")
         servers = []
         server_entry = {
             "address": self.address,
             "clients": []
         }
-        for public_key in self.client_public_keys.values():
+        for fingerprint, public_key in self.client_public_keys.items():
             public_pem = export_public_key(public_key)
             public_key_b64 = base64.b64encode(public_pem).decode('utf-8')
             server_entry["clients"].append(public_key_b64)
+            logger.debug(f"Added client with fingerprint {fingerprint} to client list")
+
         servers.append(server_entry)
 
-        # Build the client list message
         client_list_message = {
             "type": "client_list",
             "servers": servers
         }
 
-        # Send the message
         try:
             await websocket.send(json.dumps(client_list_message))
+            logger.debug(f"Sent client list: {client_list_message}")
         except Exception as e:
-            print(f"Error sending client list to client: {e}")
+            logger.error(f"Error sending client list to client: {e}")
 
     async def handle_file_upload(self, request):
         reader = await request.multipart()
