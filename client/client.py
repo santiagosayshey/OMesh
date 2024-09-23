@@ -13,8 +13,13 @@ from flask_sock import Sock
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Disable websockets library logging
+logging.getLogger('websockets').setLevel(logging.WARNING)
+logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 from common.crypto import (
     generate_rsa_key_pair,
@@ -50,6 +55,14 @@ CLIENT_WS_URI = f'ws://{SERVER_ADDRESS}:{SERVER_PORT}'
 # Flask app
 app = Flask(__name__)
 sock = Sock(app)
+
+def log_message(direction, message):
+    try:
+        parsed_message = json.loads(message)
+        formatted_json = json.dumps(parsed_message, indent=2)
+        logger.info(f"{direction} message:\n{formatted_json}")
+    except json.JSONDecodeError:
+        logger.info(f"{direction} message (not JSON):\n{message}")
 
 class Client:
     def __init__(self):
@@ -108,12 +121,12 @@ class Client:
             "public_key": public_key_b64
         }
         message = {
-            "type": "hello",  # Add this line
+            "type": "hello",
             "data": data_dict
         }
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
-        print("Sent 'hello' message to server")
+        logger.info(f"Sent 'hello' message:\n{json.dumps(message, indent=2)}")
 
 
     async def receive_messages(self):
@@ -130,6 +143,7 @@ class Client:
             print("Connection to server closed")
 
     async def handle_incoming_message(self, message_dict):
+        logger.info(f"Received message:\n{json.dumps(message_dict, indent=2)}")
         # Extract message_type
         if "type" in message_dict:
             message_type = message_dict["type"]
@@ -273,21 +287,21 @@ class Client:
         )
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
-        print(f"Sent message to {recipients}")
+        logger.info(f"Sent chat message:\n{json.dumps(message, indent=2)}")
 
     async def send_public_chat(self, message_text):
         message = build_public_chat_message(self.public_key, message_text)
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
-        print("Sent public message")
-    
+        logger.info(f"Sent public message:\n{json.dumps(message, indent=2)}")
+        
     async def request_client_list(self):
         message = {
             "type": "client_list_request"
         }
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
-        logger.info("Requested client list")
+        logger.info(f"Requested client list:\n{json.dumps(message, indent=2)}")
 
 # Create an instance of the Client
 client_instance = Client()

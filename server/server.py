@@ -10,8 +10,14 @@ import os
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Disable websockets library logging
+logging.getLogger('websockets').setLevel(logging.WARNING)
+logging.getLogger('asyncio').setLevel(logging.WARNING)
+
 
 from common.protocol import (
     parse_message,
@@ -184,17 +190,16 @@ class Server:
                     break
 
     async def broadcast_client_update(self):
-        # Build client update message
         clients_public_keys = list(self.client_public_keys.values())
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
 
-        # Send to all connected servers
         for websocket in self.servers.values():
             try:
                 await websocket.send(message_json)
+                logger.info(f"Sent client update to server:\n{json.dumps(client_update_message, indent=2)}")
             except Exception as e:
-                print(f"Error sending client update to server: {e}")
+                logger.error(f"Error sending client update to server: {e}")
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
         # Extract message_type
@@ -253,38 +258,37 @@ class Server:
     async def forward_message(self, message_dict):
         data = message_dict.get('data', {})
         message_type = data.get('type')
+        message_json = json.dumps(message_dict)
 
         if message_type == 'chat':
-            # Extract destination servers
             destination_servers = data.get('destination_servers', [])
-            # If the message is intended for clients connected to this server, deliver it
             if self.address in destination_servers:
                 await self.deliver_message_to_clients(message_dict)
-            # Forward to other servers
             for server_address in destination_servers:
                 if server_address != self.address and server_address in self.servers:
                     websocket = self.servers[server_address]
                     try:
-                        await websocket.send(json.dumps(message_dict))
+                        await websocket.send(message_json)
+                        logger.info(f"Forwarded chat message to server {server_address}:\n{json.dumps(message_dict, indent=2)}")
                     except Exception as e:
-                        print(f"Error forwarding message to server {server_address}: {e}")
+                        logger.error(f"Error forwarding message to server {server_address}: {e}")
         elif message_type == 'public_chat':
-            # Broadcast to all connected clients
             await self.deliver_message_to_clients(message_dict)
-            # Forward to all other servers
             for websocket in self.servers.values():
                 try:
-                    await websocket.send(json.dumps(message_dict))
+                    await websocket.send(message_json)
+                    logger.info(f"Forwarded public chat to server:\n{json.dumps(message_dict, indent=2)}")
                 except Exception as e:
-                    print(f"Error forwarding public chat to server: {e}")
+                    logger.error(f"Error forwarding public chat to server: {e}")
 
     async def deliver_message_to_clients(self, message_dict):
-        # Deliver message to all connected clients
+        message_json = json.dumps(message_dict)
         for websocket in self.clients.values():
             try:
-                await websocket.send(json.dumps(message_dict))
+                await websocket.send(message_json)
+                logger.info(f"Delivered message to client:\n{json.dumps(message_dict, indent=2)}")
             except Exception as e:
-                print(f"Error delivering message to client: {e}")
+                logger.error(f"Error delivering message to client: {e}")
 
     async def send_client_list(self, websocket):
         logger.debug(f"Preparing client list. Known clients: {list(self.client_public_keys.keys())}")
@@ -300,10 +304,11 @@ class Server:
             "type": "client_list",
             "servers": servers
         }
+        message_json = json.dumps(client_list_message)
 
         try:
-            await websocket.send(json.dumps(client_list_message))
-            logger.debug(f"Sent client list: {client_list_message}")
+            await websocket.send(message_json)
+            logger.info(f"Sent client list:\n{json.dumps(client_list_message, indent=2)}")
         except Exception as e:
             logger.error(f"Error sending client list to client: {e}")
 
