@@ -1,71 +1,169 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" class="dark">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OLAF Chat Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              dark: {
+                100: "#1E293B",
+                200: "#334155",
+                300: "#475569",
+              },
+            },
+          },
+        },
+      };
+    </script>
   </head>
-  <body>
-    <h1>OLAF Chat Client</h1>
+  <body class="bg-dark-100 text-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+      <h1 class="text-3xl font-bold mb-8">OLAF Chat Client</h1>
 
-    <div>
-      <button id="refresh-clients">Refresh Client List</button>
-      <button id="refresh-messages">Refresh Messages</button>
-      <button id="request-client-list">Request Client List</button>
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2">Your Fingerprint</h2>
+        <p id="user-fingerprint" class="bg-dark-200 p-2 rounded">Loading...</p>
+      </div>
+
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2">Recipients</h2>
+        <div
+          id="client-list"
+          class="bg-dark-200 p-4 rounded max-h-60 overflow-y-auto"
+        >
+          <div class="mb-2">
+            <input
+              type="radio"
+              id="global"
+              name="recipient"
+              value="global"
+              class="hidden peer"
+              checked
+            />
+            <label
+              for="global"
+              class="inline-block w-full p-2 text-gray-200 bg-dark-300 rounded-lg cursor-pointer peer-checked:bg-indigo-600 peer-checked:text-white hover:bg-dark-400"
+            >
+              Global Chat
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2">Send Message</h2>
+        <textarea
+          id="message-text"
+          rows="4"
+          class="w-full p-2 mb-2 bg-dark-200 text-gray-100 rounded"
+        ></textarea>
+        <button
+          id="send-message"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Send Message
+        </button>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold mb-2">Messages</h2>
+        <ul id="message-list" class="bg-dark-200 p-2 rounded"></ul>
+      </div>
     </div>
-
-    <h2>Your Fingerprint</h2>
-    <p id="user-fingerprint">Loading...</p>
-
-    <h2>Online Clients</h2>
-    <ul id="client-list"></ul>
-
-    <h2>Send Message</h2>
-    <textarea id="message-text" rows="4" cols="50"></textarea><br />
-    <label>Recipients (comma-separated fingerprints):</label><br />
-    <input type="text" id="recipients" /><br />
-    <button id="send-message">Send Private Message</button>
-    <button id="send-public-message">Send Public Message</button>
-
-    <h2>Messages</h2>
-    <ul id="message-list"></ul>
 
     <script>
       let userFingerprint = "";
+      let selectedRecipient = "global";
+      let clients = [];
 
+      // Function to refresh client list
       function refreshClients() {
         console.log("Refreshing clients...");
-        $.getJSON("/get_clients")
-          .done(function (data) {
-            console.log("Received client data:", data);
-            var clients = data.clients;
-            var clientList = $("#client-list");
-            clientList.empty();
-            clients.forEach(function (fingerprint) {
-              if (fingerprint !== userFingerprint) {
-                clientList.append("<li>" + fingerprint + "</li>");
-              }
-            });
+
+        // First, request the client list to refresh the known clients
+        $.getJSON("/request_client_list")
+          .done(function () {
+            // Then, fetch the updated client list
+            $.getJSON("/get_clients")
+              .done(function (data) {
+                console.log("Received client data:", data);
+                const newClients = data.clients;
+
+                // Check if the client list has changed
+                if (JSON.stringify(newClients) !== JSON.stringify(clients)) {
+                  clients = newClients;
+                  updateClientList(); // Update the UI
+                }
+              })
+              .fail(function (jqXHR, textStatus, errorThrown) {
+                console.error(
+                  "Error fetching clients:",
+                  textStatus,
+                  errorThrown
+                );
+              });
           })
           .fail(function (jqXHR, textStatus, errorThrown) {
-            console.error("Error refreshing clients:", textStatus, errorThrown);
+            console.error(
+              "Error requesting client list:",
+              textStatus,
+              errorThrown
+            );
           });
       }
 
+      // Function to update the client list in the UI
+      function updateClientList() {
+        const clientList = $("#client-list");
+
+        // Clear the current list (except the first element for Global Chat)
+        clientList.find("div:not(:first-child)").remove();
+
+        // Append each client to the list
+        clients.forEach(function (fingerprint) {
+          if (fingerprint !== userFingerprint) {
+            const clientItem = `
+              <div class="mb-2">
+                <input type="radio" id="${fingerprint}" name="recipient" value="${fingerprint}" class="hidden peer">
+                <label for="${fingerprint}" class="inline-block w-full p-2 text-gray-200 bg-dark-300 rounded-lg cursor-pointer peer-checked:bg-indigo-600 peer-checked:text-white hover:bg-dark-400">
+                  ${fingerprint}
+                </label>
+              </div>
+            `;
+            clientList.append(clientItem); // Append the new client to the list
+          }
+        });
+
+        // Restore the previously selected recipient
+        $(`input[name="recipient"][value="${selectedRecipient}"]`).prop(
+          "checked",
+          true
+        );
+      }
+
+      // Function to refresh the messages
       function refreshMessages() {
         console.log("Refreshing messages...");
         $.getJSON("/get_messages")
           .done(function (data) {
-            console.log("Received message data:", data);
-            var messages = data.messages;
-            var messageList = $("#message-list");
-            messages.forEach(function (msg) {
-              messageList.append(
-                "<li><strong>" +
-                  (msg.sender === userFingerprint ? "You" : msg.sender) +
-                  ":</strong> " +
-                  msg.message +
-                  "</li>"
-              );
+            console.log("Received messages:", data); // Debug log to check data
+            const messages = data.messages;
+
+            // Update the message list in the UI
+            const messageList = $("#message-list");
+            messageList.empty(); // Clear the current messages
+
+            // Append each message to the list
+            messages.forEach(function (message) {
+              const messageItem = `<li><strong>${message.sender}:</strong> ${message.message}</li>`;
+              messageList.append(messageItem);
             });
           })
           .fail(function (jqXHR, textStatus, errorThrown) {
@@ -78,14 +176,12 @@
       }
 
       $(document).ready(function () {
-        // Get user's fingerprint and name
+        // Fetch user fingerprint and name
         $.getJSON("/get_fingerprint")
           .done(function (data) {
             userFingerprint = data.fingerprint;
-            userName = data.name;
-            $("#user-fingerprint").text(
-              userFingerprint + " (" + userName + ")"
-            );
+            const userName = data.name;
+            $("#user-fingerprint").text(`${userFingerprint} (${userName})`);
           })
           .fail(function (jqXHR, textStatus, errorThrown) {
             console.error(
@@ -95,80 +191,70 @@
             );
           });
 
-        $("#refresh-clients").click(refreshClients);
-        $("#refresh-messages").click(refreshMessages);
-
-        $("#request-client-list").click(function () {
-          console.log("Requesting client list...");
-          $.get("/request_client_list")
-            .done(function (data) {
-              console.log("Client list request response:", data);
-              alert(data.status);
-              // Automatically refresh the client list after requesting
-              refreshClients();
-            })
-            .fail(function (jqXHR, textStatus, errorThrown) {
-              console.error(
-                "Error requesting client list:",
-                textStatus,
-                errorThrown
-              );
-            });
-        });
-
+        // Send message when button is clicked
         $("#send-message").click(function () {
-          var message = $("#message-text").val();
-          var recipients = $("#recipients")
-            .val()
-            .split(",")
-            .map(function (s) {
-              return s.trim();
+          const message = $("#message-text").val();
+          const recipient = $("input[name='recipient']:checked").val();
+          selectedRecipient = recipient;
+
+          if (recipient === "global") {
+            console.log("Sending public message:", message);
+            $.ajax({
+              url: "/send_public_message",
+              method: "POST",
+              contentType: "application/json",
+              data: JSON.stringify({ message: message }),
+              success: function (data) {
+                console.log("Public message sent response:", data);
+                alert(data.status);
+              },
+              error: function (jqXHR, textStatus, errorThrown) {
+                console.error(
+                  "Error sending public message:",
+                  textStatus,
+                  errorThrown
+                );
+              },
             });
-          console.log(
-            "Sending private message:",
-            message,
-            "to recipients:",
-            recipients
-          );
-          $.ajax({
-            url: "/send_message",
-            method: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({ message: message, recipients: recipients }),
-            success: function (data) {
-              console.log("Message sent response:", data);
-              alert(data.status);
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-              console.error("Error sending message:", textStatus, errorThrown);
-            },
-          });
+          } else {
+            console.log(
+              "Sending private message:",
+              message,
+              "to recipient:",
+              recipient
+            );
+            $.ajax({
+              url: "/send_message",
+              method: "POST",
+              contentType: "application/json",
+              data: JSON.stringify({
+                message: message,
+                recipients: [recipient],
+              }),
+              success: function (data) {
+                console.log("Message sent response:", data);
+                alert(data.status);
+              },
+              error: function (jqXHR, textStatus, errorThrown) {
+                console.error(
+                  "Error sending message:",
+                  textStatus,
+                  errorThrown
+                );
+              },
+            });
+          }
         });
 
-        $("#send-public-message").click(function () {
-          var message = $("#message-text").val();
-          console.log("Sending public message:", message);
-          $.ajax({
-            url: "/send_public_message",
-            method: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({ message: message }),
-            success: function (data) {
-              console.log("Public message sent response:", data);
-              alert(data.status);
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-              console.error(
-                "Error sending public message:",
-                textStatus,
-                errorThrown
-              );
-            },
-          });
-        });
-
-        // Initial client list refresh
+        // Initial refresh
         refreshClients();
+        refreshMessages();
+
+        // Set up automatic refresh every second
+        setInterval(function () {
+          refreshClients();
+          refreshMessages();
+        }, 1000);
       });
     </script>
   </body>
