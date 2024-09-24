@@ -1,5 +1,3 @@
-# docker-compose.yml
-
 version: "3.8"
 
 services:
@@ -10,7 +8,7 @@ services:
     container_name: olaf_server1
     ports:
       - "8765:8765" # WebSocket port for clients
-      - "8766:8766" # WebSocket port for servers
+      - "8766:8766" # WebSocket port for servers (server1's server WS port)
       - "8081:8081" # HTTP port for file transfers
     volumes:
       - ./server/clients:/app/server/clients
@@ -18,8 +16,9 @@ services:
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
+      - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server2:8765
+      - NEIGHBOUR_ADDRESSES=server2:8768 # Pointing to server2's server WS port
     networks:
       - olaf_network
 
@@ -29,8 +28,8 @@ services:
       dockerfile: ./server/Dockerfile
     container_name: olaf_server2
     ports:
-      - "8767:8765" # WebSocket port for clients
-      - "8768:8766" # WebSocket port for servers
+      - "8767:8765" # WebSocket port for clients (server2's client WS port mapped to host 8767)
+      - "8768:8766" # WebSocket port for servers (server2's server WS port mapped to host 8768)
       - "8082:8081" # HTTP port for file transfers
     volumes:
       - ./server/clients2:/app/server/clients
@@ -38,8 +37,9 @@ services:
     environment:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
+      - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server1:8765
+      - NEIGHBOUR_ADDRESSES=server1:8766 # Pointing to server1's server WS port
     networks:
       - olaf_network
 

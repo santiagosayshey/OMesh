@@ -7,10 +7,11 @@ from common.crypto import (
     generate_iv,
     encrypt_aes_gcm,
     encrypt_rsa_oaep,
-    calculate_fingerprint
+    calculate_fingerprint,
+    sign_data,
+    verify_signature
 )
 from enum import Enum
-from collections import defaultdict
 from cryptography.hazmat.primitives import serialization
 
 # Enum for message types
@@ -24,7 +25,6 @@ class MessageType(Enum):
     HELLO = "hello"
     CHAT = "chat"
     PUBLIC_CHAT = "public_chat"
-
 
 # Function to build a signed message
 def build_signed_message(data_dict, private_key, counter):
@@ -132,7 +132,6 @@ def build_hello_message(public_key, private_key, counter):
     }
     return build_signed_message(data_dict, private_key, counter)
 
-
 # Function to construct a 'chat' message
 def build_chat_message(destination_servers, recipients_public_keys, sender_private_key, counter, message_text):
     # Generate AES key and IV
@@ -174,7 +173,6 @@ def build_chat_message(destination_servers, recipients_public_keys, sender_priva
     # Wrap the 'data' field in 'signed_data'
     signed_message = build_signed_message(data_dict, sender_private_key, counter)
     return signed_message
-
 
 # Function to construct a 'public_chat' message
 def build_public_chat_message(sender_public_key, sender_private_key, counter, message_text):
@@ -246,11 +244,10 @@ def build_server_hello(sender_address):
         "sender": sender_address
     }
     message = {
+        "type": MessageType.SERVER_HELLO.value,
         "data": data_dict
     }
     return message
-
-
 
 # Function to validate the structure of a received message
 def validate_message_format(message_dict):
@@ -280,6 +277,10 @@ def validate_message_format(message_dict):
     elif message_type == "hello":
         required_fields = ["data"]
     elif message_type == "server_hello":
+        required_fields = ["data"]
+    elif message_type == "chat":
+        required_fields = ["data"]
+    elif message_type == "public_chat":
         required_fields = ["data"]
     else:
         print(f"Validation Error: Unknown message type '{message_type}'.")
