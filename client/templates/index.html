@@ -148,22 +148,30 @@
         );
       }
 
+      // Store the existing messages
+      let storedMessages = [];
+
       // Function to refresh the messages
       function refreshMessages() {
         console.log("Refreshing messages...");
         $.getJSON("/get_messages")
           .done(function (data) {
             console.log("Received messages:", data); // Debug log to check data
-            const messages = data.messages;
+            const newMessages = data.messages;
 
-            // Update the message list in the UI
-            const messageList = $("#message-list");
-            messageList.empty(); // Clear the current messages
-
-            // Append each message to the list
-            messages.forEach(function (message) {
-              const messageItem = `<li><strong>${message.sender}:</strong> ${message.message}</li>`;
-              messageList.append(messageItem);
+            // Update the message list only with new messages
+            newMessages.forEach(function (message) {
+              // Check if the message already exists in the storedMessages array
+              if (
+                !storedMessages.some(
+                  (m) =>
+                    m.sender === message.sender && m.message === message.message
+                )
+              ) {
+                storedMessages.push(message); // Add new message to the stored array
+                const messageItem = `<li><strong>${message.sender}:</strong> ${message.message}</li>`;
+                $("#message-list").append(messageItem); // Append the new message to the UI
+              }
             });
           })
           .fail(function (jqXHR, textStatus, errorThrown) {
