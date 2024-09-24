@@ -169,8 +169,10 @@ class Client:
             logger.warning("Unknown message type received.")
             return
         data = message_dict.get('data', {})
-
-        if message_type == 'client_list':
+        if message_type == 'signed_data':
+            # Handle signed_data message
+            await self.handle_signed_data_message(message_dict)
+        elif message_type == 'client_list':
             # Update known clients and fingerprint_to_server mapping
             servers = message_dict.get('servers', [])
             for server_entry in servers:
@@ -212,6 +214,28 @@ class Client:
             }))
         else:
             logger.warning(f"Unknown message type: {message_type}")
+
+    async def handle_signed_data_message(self, message_dict):
+        data = message_dict.get('data', {})
+        inner_type = data.get('type')
+        
+        if inner_type == 'chat':
+            # Handle chat message
+            await self.decrypt_and_store_message(data)
+        elif inner_type == 'public_chat':
+            # Handle public chat message
+            sender_fingerprint = data.get('sender')
+            message_text = data.get('message')
+            self.incoming_messages.append({
+                'sender': sender_fingerprint,
+                'message': message_text
+            })
+            log_message("Received", json.dumps({
+                'sender': sender_fingerprint,
+                'message': message_text
+            }))
+        else:
+            logger.warning(f"Unknown inner type in signed_data: {inner_type}")
 
     async def decrypt_and_store_message(self, data):
         symm_keys_b64 = data.get('symm_keys', [])
