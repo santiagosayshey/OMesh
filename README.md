@@ -6,7 +6,7 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 
 ## Preview
 
-![Demo GIF](./.github/preview.gif)
+![Demo GIF](./.github/preview.png)
 
 ---
 
