@@ -13,3 +13,6 @@ htmlcov/
 
 # Pytest logs or other output files (if any)
 *.log
+
+frontend/build
+client/templates
