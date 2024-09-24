@@ -4,6 +4,10 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 
 **Group Members:** Samuel Chau and Menno Brandt
 
+## Preview
+
+![Demo GIF](./.github/preview.gif)
+
 ---
 
 ## Table of Contents
