@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 logging.getLogger('websockets').setLevel(logging.WARNING)
 logging.getLogger('asyncio').setLevel(logging.WARNING)
 
+# Enable detailed message logging based on the LOG_MESSAGES environment variable
+LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true', '1', 't')
+
 from common.crypto import (
     generate_rsa_key_pair,
     load_public_key,
@@ -56,14 +59,20 @@ app = Flask(__name__)
 sock = Sock(app)
 
 def log_message(direction, message):
-    try:
-        parsed_message = json.loads(message)
-        # Remove or mask 'public_key' and 'signature' fields
-        sanitized_message = sanitize_message(parsed_message)
-        formatted_json = json.dumps(sanitized_message, indent=2)
-        logger.info(f"{direction} message:\n{formatted_json}")
-    except json.JSONDecodeError:
-        logger.info(f"{direction} message (not JSON):\n{message}")
+    # Always log the basic message direction
+    logger.info(f"{direction} message.")
+
+    # Conditionally log the detailed message content
+    if LOG_MESSAGES:
+        try:
+            parsed_message = json.loads(message)
+            # Remove or mask 'public_key' and 'signature' fields
+            sanitized_message = sanitize_message(parsed_message)
+            formatted_json = json.dumps(sanitized_message, indent=2)
+            logger.info(f"{direction} message details:\n{formatted_json}")
+        except json.JSONDecodeError:
+            logger.info(f"{direction} message (not JSON):\n{message}")
+
 
 def sanitize_message(message):
     """
