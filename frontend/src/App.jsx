@@ -8,9 +8,11 @@ function OlafChatClient() {
   const [storedMessages, setStoredMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
 
   const dropdownRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Fetch user fingerprint and name on component mount
   useEffect(() => {
@@ -153,33 +155,111 @@ function OlafChatClient() {
     setMessageText("");
   };
 
-  // Handle file selection
-  const handleFileChange = (event) => {
-    setSelectedFile(event.target.files[0]);
+  // Function to trigger file input click
+  const triggerFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
 
-  // Handle file upload
-  const handleFileUpload = () => {
-    if (!selectedFile) {
-      return;
+  // Function to handle file selection
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setUploadError(""); // Reset upload error
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Include selected recipients
+      selectedRecipients.forEach((recipient) => {
+        formData.append("recipients[]", recipient);
+      });
+
+      fetch("/upload_file", {
+        method: "POST",
+        body: formData,
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            const data = await response.json();
+            console.log("File upload response:", data);
+          } else {
+            // Handle errors
+            const errorData = await response.json();
+            console.error("File upload error:", errorData);
+            setUploadError(errorData.error || "File upload failed");
+          }
+          // Clear selected file after upload
+          event.target.value = null;
+        })
+        .catch((error) => {
+          console.error("Error uploading file:", error);
+          setUploadError("Error uploading file");
+        });
+    }
+  };
+
+  // Function to send file message
+  const sendFileMessage = (fileUrl, messageText) => {
+    if (selectedRecipients.includes("global")) {
+      // Send public message
+      fetch("/send_public_message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `[File] ${messageText} ${fileUrl}` }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          console.log("Public file message sent response:", data);
+        })
+        .catch((error) => {
+          console.error("Error sending public file message:", error);
+        });
     }
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
+    const privateRecipients = selectedRecipients.filter((r) => r !== "global");
 
-    fetch("/upload_file", {
-      method: "POST",
-      body: formData,
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log("File upload response:", data);
-        // Clear selected file after upload
-        setSelectedFile(null);
+    if (privateRecipients.length > 0) {
+      // Send private message to selected recipients
+      fetch("/send_message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `[File] ${messageText} ${fileUrl}`,
+          recipients: privateRecipients,
+        }),
       })
-      .catch((error) => {
-        console.error("Error uploading file:", error);
-      });
+        .then((response) => response.json())
+        .then((data) => {
+          console.log("Private file message sent response:", data);
+        })
+        .catch((error) => {
+          console.error("Error sending private file message:", error);
+        });
+    }
+  };
+
+  // Function to get file type icon
+  const getFileTypeIcon = (fileUrl) => {
+    const extension = fileUrl.split(".").pop().toLowerCase();
+    switch (extension) {
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+        return "🖼️"; // Image icon
+      case "pdf":
+        return "📄"; // PDF icon
+      case "zip":
+      case "rar":
+        return "🗜️"; // Archive icon
+      case "txt":
+      case "doc":
+      case "docx":
+        return "📝"; // Document icon
+      default:
+        return "📁"; // Default file icon
+    }
   };
 
   // Handle click outside the dropdown to close it
@@ -208,51 +288,84 @@ function OlafChatClient() {
         {/* Message pane */}
         <div className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg">
           {storedMessages.map((message, index) => {
-            const fileUrlMatch = message.message.match(/\[File URL: (.+?)\]/);
-            const messageText = message.message
-              .replace(/\[File URL: .+?\]/, "")
-              .trim();
-            const fileUrl = fileUrlMatch ? fileUrlMatch[1] : null;
+            const isFileMessage = message.message.startsWith("[File]");
+            let messageContent = message.message;
+            if (isFileMessage) {
+              messageContent = message.message.replace("[File]", "").trim();
+            }
 
             return (
               <div key={index} className="mb-2">
-                <strong>{message.sender}:</strong> {messageText}
-                {fileUrl && (
-                  <div>
-                    <a
-                      href={fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 underline"
-                    >
-                      Download File
-                    </a>
+                <strong>{message.sender}:</strong>{" "}
+                {isFileMessage ? (
+                  <div className="flex items-center mt-2">
+                    {["jpg", "jpeg", "png", "gif"].includes(
+                      messageContent.split(".").pop().toLowerCase()
+                    ) ? (
+                      <img
+                        src={messageContent}
+                        alt="Shared file"
+                        className="max-w-xs max-h-48 rounded-lg"
+                      />
+                    ) : (
+                      <>
+                        <span className="mr-2">
+                          {getFileTypeIcon(messageContent)}
+                        </span>
+                        <a
+                          href={messageContent}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 underline"
+                        >
+                          {messageContent.split("/").pop()}
+                        </a>
+                      </>
+                    )}
                   </div>
+                ) : (
+                  messageContent
                 )}
               </div>
             );
           })}
         </div>
 
+        {/* Upload error message */}
+        {uploadError && (
+          <div className="text-red-500 mt-2">
+            <strong>Error:</strong> {uploadError}
+          </div>
+        )}
+
         {/* Message input area */}
         <div className="mt-4">
-          {/* File upload section */}
-          <div className="mb-4">
-            <input
-              type="file"
-              onChange={handleFileChange}
-              className="text-white"
-            />
-            <button
-              onClick={handleFileUpload}
-              className="text-white bg-green-600 hover:bg-green-500 rounded-full px-3 py-1 focus:outline-none ml-2"
-            >
-              Upload File
-            </button>
-          </div>
           <div className="relative">
             <div className="flex items-center bg-gray-800 text-white rounded-full px-4 py-3">
+              {/* File upload button */}
+              <button
+                onClick={triggerFileUpload}
+                className="text-white hover:bg-gray-700 rounded-full px-2 py-1 focus:outline-none mr-2 flex items-center"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  stroke="none"
+                  viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
+                </svg>
+              </button>
+              {/* Hidden file input */}
+              <input
+                type="file"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+                style={{ display: "none" }}
+              />
               <div className="relative" ref={dropdownRef}>
+                {/* Recipient dropdown button */}
                 <button
                   onClick={() =>
                     setIsRecipientDropdownOpen(!isRecipientDropdownOpen)
