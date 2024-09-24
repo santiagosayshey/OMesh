@@ -3,21 +3,28 @@ import React, { useState, useEffect, useRef } from "react";
 function OlafChatClient() {
   const [userFingerprint, setUserFingerprint] = useState("");
   const [userName, setUserName] = useState("");
+  const [serverAddress, setServerAddress] = useState(""); // Added serverAddress
+  const [serverPort, setServerPort] = useState(""); // Added serverPort
   const [selectedRecipients, setSelectedRecipients] = useState(["global"]);
   const [clients, setClients] = useState([]);
   const [storedMessages, setStoredMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const dropdownRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  // Fetch user fingerprint and name on component mount
+  // Fetch user fingerprint, name, and server info on component mount
   useEffect(() => {
     fetch("/get_fingerprint")
       .then((response) => response.json())
       .then((data) => {
         setUserFingerprint(data.fingerprint);
         setUserName(data.name);
+        setServerAddress(data.server_address); // Set serverAddress
+        setServerPort(data.server_port); // Set serverPort
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
@@ -152,6 +159,113 @@ function OlafChatClient() {
     setMessageText("");
   };
 
+  // Function to trigger file input click
+  const triggerFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Function to handle file selection
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setUploadError(""); // Reset upload error
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Include selected recipients
+      selectedRecipients.forEach((recipient) => {
+        formData.append("recipients[]", recipient);
+      });
+
+      fetch("/upload_file", {
+        method: "POST",
+        body: formData,
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            const data = await response.json();
+            console.log("File upload response:", data);
+          } else {
+            // Handle errors
+            const errorData = await response.json();
+            console.error("File upload error:", errorData);
+            setUploadError(errorData.error || "File upload failed");
+          }
+          // Clear selected file after upload
+          event.target.value = null;
+        })
+        .catch((error) => {
+          console.error("Error uploading file:", error);
+          setUploadError("Error uploading file");
+        });
+    }
+  };
+
+  // Function to send file message
+  const sendFileMessage = (fileUrl, messageText) => {
+    if (selectedRecipients.includes("global")) {
+      // Send public message
+      fetch("/send_public_message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `[File] ${messageText} ${fileUrl}` }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          console.log("Public file message sent response:", data);
+        })
+        .catch((error) => {
+          console.error("Error sending public file message:", error);
+        });
+    }
+
+    const privateRecipients = selectedRecipients.filter((r) => r !== "global");
+
+    if (privateRecipients.length > 0) {
+      // Send private message to selected recipients
+      fetch("/send_message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `[File] ${messageText} ${fileUrl}`,
+          recipients: privateRecipients,
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          console.log("Private file message sent response:", data);
+        })
+        .catch((error) => {
+          console.error("Error sending private file message:", error);
+        });
+    }
+  };
+
+  // Function to get file type icon
+  const getFileTypeIcon = (fileUrl) => {
+    const extension = fileUrl.split(".").pop().toLowerCase();
+    switch (extension) {
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+        return "🖼️"; // Image icon
+      case "pdf":
+        return "📄"; // PDF icon
+      case "zip":
+      case "rar":
+        return "🗜️"; // Archive icon
+      case "txt":
+      case "doc":
+      case "docx":
+        return "📝"; // Document icon
+      default:
+        return "📁"; // Default file icon
+    }
+  };
+
   // Handle click outside the dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -173,22 +287,106 @@ function OlafChatClient() {
   return (
     <div className="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
       <div className="container mx-auto px-4 py-8 flex flex-col flex-grow">
-        <h1 className="text-3xl font-bold mb-4">OLAF Chat Client</h1>
+        {/* Header section without the description */}
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold">OMesh</h1>
+        </div>
+
+        {/* Client info */}
+        <div className="mb-4">
+          <p>
+            <strong>Name:</strong> {userName}
+          </p>
+          <p>
+            <strong>Fingerprint:</strong> {userFingerprint}
+          </p>
+          <p>
+            <strong>Connected to Server:</strong> {serverAddress}:{serverPort}
+          </p>
+        </div>
 
         {/* Message pane */}
         <div className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg">
-          {storedMessages.map((message, index) => (
-            <div key={index} className="mb-2">
-              <strong>{message.sender}:</strong> {message.message}
-            </div>
-          ))}
+          {storedMessages.map((message, index) => {
+            const isFileMessage = message.message.startsWith("[File]");
+            let messageContent = message.message;
+            if (isFileMessage) {
+              messageContent = message.message.replace("[File]", "").trim();
+            }
+
+            return (
+              <div key={index} className="mb-2">
+                <strong>{message.sender}:</strong>{" "}
+                {isFileMessage ? (
+                  <div className="flex items-center mt-2">
+                    {["jpg", "jpeg", "png", "gif"].includes(
+                      messageContent.split(".").pop().toLowerCase()
+                    ) ? (
+                      <img
+                        src={messageContent}
+                        alt="Shared file"
+                        className="max-w-xs max-h-48 rounded-lg"
+                      />
+                    ) : (
+                      <>
+                        <span className="mr-2">
+                          {/* File icon can be added here */}
+                          {getFileTypeIcon(messageContent)}
+                        </span>
+                        <a
+                          href={messageContent}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 underline"
+                        >
+                          {messageContent.split("/").pop()}
+                        </a>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  messageContent
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        {/* Upload error message */}
+        {uploadError && (
+          <div className="text-red-500 mt-2">
+            <strong>Error:</strong> {uploadError}
+          </div>
+        )}
 
         {/* Message input area */}
         <div className="mt-4">
           <div className="relative">
             <div className="flex items-center bg-gray-800 text-white rounded-full px-4 py-3">
+              {/* File upload button */}
+              <button
+                onClick={triggerFileUpload}
+                className="text-white hover:bg-gray-700 rounded-full px-2 py-1 focus:outline-none mr-2 flex items-center"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  stroke="none"
+                  viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
+                </svg>
+              </button>
+              {/* Hidden file input */}
+              <input
+                type="file"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+                style={{ display: "none" }}
+              />
               <div className="relative" ref={dropdownRef}>
+                {/* Recipient dropdown button */}
                 <button
                   onClick={() =>
                     setIsRecipientDropdownOpen(!isRecipientDropdownOpen)
@@ -287,6 +485,37 @@ function OlafChatClient() {
           </div>
         </div>
       </div>
+
+      {/* Footer section */}
+      <footer className="text-white-400 py-4 text-center">
+        <span className="text-sm">
+          An open source implementation of OLAF's Neighbourhood protocol,
+          developed in Python and React.
+        </span>
+        <a
+          href="https://github.com/santiagosayshey/OMesh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center ml-2 text-white-400 hover:text-blue-300"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4 ml-1"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            role="img"
+            focusable="false"
+          >
+            <title>GitHub Repository</title>
+            <path
+              fillRule="evenodd"
+              d="M12 0C5.372 0 0 5.373 0 12c0 5.303 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.73.083-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.305-5.467-1.332-5.467-5.93 0-1.31.468-2.381 1.235-3.221-.123-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.3 1.23a11.52 11.52 0 013.003-.404c1.02.005 2.045.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.241 2.874.119 3.176.77.84 1.233 1.911 1.233 3.221 0 4.61-2.807 5.625-5.48 5.92.43.372.823 1.102.823 2.222v3.293c0 .322.218.694.825.576C20.565 21.796 24 17.3 24 12c0-6.627-5.373-12-12-12z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </a>
+      </footer>
     </div>
   );
 }

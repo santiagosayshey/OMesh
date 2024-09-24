@@ -19,6 +19,7 @@ services:
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server2:8766
       - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
     networks:
       - olaf_network
 
@@ -39,8 +40,55 @@ services:
       - SERVER_PORT=8765
       - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server1:8766
+      - NEIGHBOUR_ADDRESSES=server1:8766,server3:8766,server4:8766
       - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
+    networks:
+      - olaf_network
+
+  server3:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server3
+    ports:
+      - "8769:8765" # WebSocket port for clients
+      - "8770:8766" # WebSocket port for servers
+      - "8083:8081" # HTTP port for file transfers
+    volumes:
+      - ./server/clients3:/app/server/clients
+      - ./server/files3:/app/server/files
+    environment:
+      - SERVER_ADDRESS=server3
+      - SERVER_PORT=8765
+      - SERVER_SERVER_PORT=8766
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766,server4:8766
+      - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
+    networks:
+      - olaf_network
+
+  server4:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server4
+    ports:
+      - "8771:8765" # WebSocket port for clients
+      - "8772:8766" # WebSocket port for servers
+      - "8084:8081" # HTTP port for file transfers
+    volumes:
+      - ./server/clients4:/app/server/clients
+      - ./server/files4:/app/server/files
+    environment:
+      - SERVER_ADDRESS=server4
+      - SERVER_PORT=8765
+      - SERVER_SERVER_PORT=8766
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766,server3:8766
+      - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
     networks:
       - olaf_network
 
