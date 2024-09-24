@@ -363,42 +363,44 @@ class Server:
     async def forward_message(self, message_dict):
         data = message_dict.get('data', {})
         message_type = data.get('type')
-        message_json = json.dumps(message_dict)
 
         if message_type == 'chat':
             destination_servers = data.get('destination_servers', [])
-            if not destination_servers:
-                logger.error("No destination servers specified in chat message.")
-                return
-
-            logger.info(f"Forwarding message to servers: {destination_servers}")
-
+            
+            # Deliver to clients on this server if it's a destination
+            if self.address in destination_servers:
+                await self.deliver_message_to_clients(message_dict)
+            
+            # Forward to other servers, but only the part they need
             for server_address in destination_servers:
-                if server_address == self.address:
-                    await self.deliver_message_to_clients(message_dict)
-                elif server_address in self.servers:
+                if server_address != self.address and server_address in self.servers:
                     websocket = self.servers[server_address]
                     try:
-                        await websocket.send(message_json)
-                        log_message("Forwarded", message_json)
+                        # Create a new message with only this server as destination
+                        server_specific_message = message_dict.copy()
+                        server_specific_message['data'] = data.copy()
+                        server_specific_message['data']['destination_servers'] = [server_address]
+                        
+                        # Send the server-specific message
+                        await websocket.send(json.dumps(server_specific_message))
+                        log_message("Forwarded", json.dumps(server_specific_message))
                         logger.info(f"Forwarded chat message to server {server_address}.")
                     except Exception as e:
                         logger.error(f"Error forwarding message to server {server_address}: {e}")
-                else:
-                    logger.error(f"Destination server {server_address} not found in known servers.")
 
         elif message_type == 'public_chat':
-            # Broadcast public chat to all clients and servers
+            # Handle public chat (broadcast to all clients and servers)
             await self.deliver_message_to_clients(message_dict)
             for server_address, websocket in self.servers.items():
-                try:
-                    await websocket.send(message_json)
-                    log_message("Sent", message_json)
-                    logger.info(f"Broadcasted public chat to server {server_address}.")
-                except Exception as e:
-                    logger.error(f"Error forwarding public chat to server {server_address}: {e}")
+                if server_address != self.address:
+                    try:
+                        await websocket.send(json.dumps(message_dict))
+                        log_message("Forwarded", json.dumps(message_dict))
+                        logger.info(f"Broadcasted public chat to server {server_address}.")
+                    except Exception as e:
+                        logger.error(f"Error forwarding public chat to server {server_address}: {e}")
         else:
-            print(f"Unknown message type: {message_type}")
+            logger.warning(f"Unknown message type: {message_type}")
 
     async def deliver_message_to_clients(self, message_dict):
         message_json = json.dumps(message_dict)
