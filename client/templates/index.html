@@ -78,11 +78,14 @@
       }
 
       $(document).ready(function () {
-        // Get user's fingerprint
+        // Get user's fingerprint and name
         $.getJSON("/get_fingerprint")
           .done(function (data) {
             userFingerprint = data.fingerprint;
-            $("#user-fingerprint").text(userFingerprint);
+            userName = data.name;
+            $("#user-fingerprint").text(
+              userFingerprint + " (" + userName + ")"
+            );
           })
           .fail(function (jqXHR, textStatus, errorThrown) {
             console.error(

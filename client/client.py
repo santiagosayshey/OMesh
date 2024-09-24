@@ -22,6 +22,8 @@ logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 # Enable detailed message logging based on the LOG_MESSAGES environment variable
 LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true', '1', 't')
+# Get client name from ENV
+CLIENT_NAME = os.environ.get('CLIENT_NAME', f"Client_{os.getpid()}")
 
 from common.crypto import (
     generate_rsa_key_pair,
@@ -98,6 +100,7 @@ class Client:
         self.fingerprint_to_server = {}  # {fingerprint: server_address}
         self.last_counters = {}  # {fingerprint: last_counter}
         self.incoming_messages = []
+        self.name = CLIENT_NAME
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -344,7 +347,10 @@ class Client:
     @app.route('/get_fingerprint', methods=['GET'])
     def get_fingerprint():
         fingerprint = calculate_fingerprint(client_instance.public_key)
-        return jsonify({'fingerprint': fingerprint})
+        return jsonify({
+            'fingerprint': fingerprint,
+            'name': client_instance.name
+        })
 
     async def send_chat_message(self, recipients, message_text):
         # Filter out recipients that are known

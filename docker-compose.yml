@@ -99,6 +99,7 @@ services:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client1
     networks:
       - olaf_network
     depends_on:
@@ -115,6 +116,7 @@ services:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client2
     networks:
       - olaf_network
     depends_on:
@@ -131,6 +133,7 @@ services:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client3
     networks:
       - olaf_network
     depends_on:
@@ -147,6 +150,7 @@ services:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client4
     networks:
       - olaf_network
     depends_on:
@@ -163,6 +167,7 @@ services:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client5
     networks:
       - olaf_network
     depends_on:
@@ -179,6 +184,7 @@ services:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client6
     networks:
       - olaf_network
     depends_on:
@@ -195,6 +201,7 @@ services:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client7
     networks:
       - olaf_network
     depends_on:
@@ -211,6 +218,7 @@ services:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
+      - CLIENT_NAME=Client8
     networks:
       - olaf_network
     depends_on:
