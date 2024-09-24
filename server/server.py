@@ -239,8 +239,11 @@ class Server:
         Broadcasts the current client list to all connected servers.
         Each server will receive only the clients connected to this server.
         """
-        # Prepare client_update message with all connected clients' public keys
-        clients_public_keys = list(self.client_public_keys.values())
+        # Prepare client_update message with only the clients connected to this server
+        clients_public_keys = [
+            public_key for fingerprint, public_key in self.client_public_keys.items()
+            if self.fingerprint_to_server.get(fingerprint) == self.address
+        ]
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
 
@@ -323,8 +326,12 @@ class Server:
                 public_key = load_public_key(public_key_pem)
                 fingerprint = calculate_fingerprint(public_key)
                 self.client_public_keys[fingerprint] = public_key
-                self.fingerprint_to_server[fingerprint] = server_address  # Correct mapping
-                logger.info(f"Client {fingerprint} is associated with server {server_address}.")
+                
+                # Only update the fingerprint_to_server mapping if it doesn't exist
+                # or if the existing mapping is for the current server
+                if fingerprint not in self.fingerprint_to_server or self.fingerprint_to_server[fingerprint] == self.address:
+                    self.fingerprint_to_server[fingerprint] = server_address
+                    logger.info(f"Client {fingerprint} is associated with server {server_address}.")
 
             logger.info(f"Updated client list from server {server_address}.")
 
@@ -361,25 +368,24 @@ class Server:
         if message_type == 'chat':
             destination_servers = data.get('destination_servers', [])
             if not destination_servers:
-                print("No destination servers specified in chat message.")
+                logger.error("No destination servers specified in chat message.")
                 return
 
-            # Forward the message to each destination server
+            logger.info(f"Forwarding message to servers: {destination_servers}")
+
             for server_address in destination_servers:
                 if server_address == self.address:
-                    # Deliver to clients on this server
                     await self.deliver_message_to_clients(message_dict)
                 elif server_address in self.servers:
-                    # Forward to other servers in the neighborhood
                     websocket = self.servers[server_address]
                     try:
                         await websocket.send(message_json)
-                        log_message("Sent", message_json)
+                        log_message("Forwarded", message_json)
                         logger.info(f"Forwarded chat message to server {server_address}.")
                     except Exception as e:
                         logger.error(f"Error forwarding message to server {server_address}: {e}")
                 else:
-                    print(f"Destination server {server_address} not found in known servers.")
+                    logger.error(f"Destination server {server_address} not found in known servers.")
 
         elif message_type == 'public_chat':
             # Broadcast public chat to all clients and servers

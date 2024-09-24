@@ -353,13 +353,11 @@ class Client:
         })
 
     async def send_chat_message(self, recipients, message_text):
-        # Filter out recipients that are known
         valid_recipients = [fingerprint for fingerprint in recipients if fingerprint in self.known_clients]
         if not valid_recipients:
             logger.error("No valid recipients found.")
             return
 
-        # Determine the unique set of destination servers
         destination_servers_set = set()
         recipients_public_keys = []
         for fingerprint in valid_recipients:
@@ -369,13 +367,15 @@ class Client:
                 recipients_public_keys.append(self.known_clients[fingerprint])
             else:
                 logger.error(f"Server address for fingerprint {fingerprint} not found.")
-        
+
         destination_servers = list(destination_servers_set)
         if not destination_servers:
             logger.error("No destination servers found for recipients.")
             return
 
-        self.counter += 1  # Increment counter
+        logger.info(f"Sending message to servers: {destination_servers}")
+
+        self.counter += 1
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
