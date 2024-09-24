@@ -19,6 +19,7 @@ services:
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server2:8766,server3:8766,server4:8766
       - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
     networks:
       - olaf_network
 
@@ -41,6 +42,7 @@ services:
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server1:8766,server3:8766,server4:8766
       - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
     networks:
       - olaf_network
 
@@ -63,6 +65,7 @@ services:
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766,server4:8766
       - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
     networks:
       - olaf_network
 
@@ -85,6 +88,7 @@ services:
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766,server3:8766
       - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
     networks:
       - olaf_network
 

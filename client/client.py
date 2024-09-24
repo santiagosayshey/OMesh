@@ -1,5 +1,3 @@
-# client/client.py
-
 import asyncio
 import json
 import websockets
@@ -9,7 +7,6 @@ import os
 import aiohttp
 
 from flask import Flask, render_template, request, jsonify
-from flask_sock import Sock
 
 import logging
 
@@ -22,44 +19,37 @@ logging.getLogger('websockets').setLevel(logging.WARNING)
 logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 # Enable detailed message logging based on the LOG_MESSAGES environment variable
-LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true', '1', 't')
+LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true','1', 't')
 # Get client name from ENV
 CLIENT_NAME = os.environ.get('CLIENT_NAME', f"Client_{os.getpid()}")
 
 from common.crypto import (
     generate_rsa_key_pair,
     load_public_key,
-    load_private_key,
     export_public_key,
     export_private_key,
-    encrypt_rsa_oaep,
     decrypt_rsa_oaep,
-    encrypt_aes_gcm,
     decrypt_aes_gcm,
     calculate_fingerprint,
-    generate_aes_key,
-    generate_iv,
 )
 from common.protocol import (
-    build_signed_message,
     build_hello_message,
     build_chat_message,
     build_public_chat_message,
-    build_client_list_request,
     parse_message,
     verify_signed_message,
     validate_message_format,
-    MessageType
 )
 
 # Configuration
 SERVER_ADDRESS = os.environ.get('SERVER_ADDRESS', 'server1')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', 8765))
 CLIENT_WS_URI = f'ws://{SERVER_ADDRESS}:{SERVER_PORT}'
+PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'localhost')
+HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
 
 # Flask app
 app = Flask(__name__)
-sock = Sock(app)
 
 os.makedirs('uploads', exist_ok=True)
 
@@ -77,7 +67,6 @@ def log_message(direction, message):
             logger.info(f"{direction} message details:\n{formatted_json}")
         except json.JSONDecodeError:
             logger.info(f"{direction} message (not JSON):\n{message}")
-
 
 def sanitize_message(message):
     """
@@ -104,7 +93,7 @@ class Client:
         self.last_counters = {}  # {fingerprint: last_counter}
         self.incoming_messages = []
         self.name = CLIENT_NAME
-        self.http_port = int(os.environ.get('HTTP_PORT', 8081))
+        self.http_port = HTTP_PORT
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -225,7 +214,7 @@ class Client:
     async def handle_signed_data_message(self, message_dict):
         data = message_dict.get('data', {})
         inner_type = data.get('type')
-        
+
         if inner_type == 'chat':
             # Handle chat message
             await self.decrypt_and_store_message(data)
@@ -269,7 +258,7 @@ class Client:
                 symm_key = decrypt_rsa_oaep(symm_key_encrypted, private_key)
                 plaintext_bytes = decrypt_aes_gcm(ciphertext, symm_key, iv, tag)
                 chat_data = json.loads(plaintext_bytes.decode('utf-8'))
-                
+
                 participants = chat_data.get('participants', [])
                 if my_fingerprint in participants:
                     sender_fingerprint = participants[0]
@@ -293,13 +282,13 @@ class Client:
         werkzeug_logger = logging.getLogger('werkzeug')
         werkzeug_logger.setLevel(logging.ERROR)
         werkzeug_logger.propagate = False
-        
+
         # Disable Flask's default logger
         app.logger.disabled = True
         flask_logger = logging.getLogger('flask')
         flask_logger.setLevel(logging.ERROR)
         flask_logger.propagate = False
-        
+
         # Start Flask app
         app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
@@ -347,7 +336,7 @@ class Client:
             client_instance.loop
         )
         return jsonify({'status': 'Client list requested'})
-    
+
     @app.route('/get_fingerprint', methods=['GET'])
     def get_fingerprint():
         fingerprint = calculate_fingerprint(client_instance.public_key)
@@ -358,20 +347,20 @@ class Client:
 
     @app.route('/upload_file', methods=['POST'])
     def upload_file_route():
-        file = request.files['file']
+        file = request.files.get('file')
+        recipients = request.form.getlist('recipients[]')
         if file:
             filename = file.filename
             file_path = os.path.join('uploads', filename)
             file.save(file_path)
             asyncio.run_coroutine_threadsafe(
-                client_instance.upload_and_share_file(file_path),
+                client_instance.upload_and_share_file(file_path, recipients),
                 client_instance.loop
             )
             return jsonify({'status': 'File uploaded and shared'})
         else:
-            return jsonify({'status': 'No file provided'}), 400
+            return jsonify({'error': 'No file provided'}), 400
 
-    
     async def upload_file(self, file_path):
         url = f'http://{self.server_address}:{self.http_port}/api/upload'
         async with aiohttp.ClientSession() as session:
@@ -384,10 +373,28 @@ class Client:
                         file_url = json_response.get('file_url')
                         return file_url
                     else:
-                        logger.error(f"File upload failed with status {resp.status}")
+                        error_message = await resp.text()
+                        logger.error(f"File upload failed with status {resp.status}: {error_message}")
                         return None
 
-    async def send_chat_message(self, recipients, message_text, file_url=None):
+    async def upload_and_share_file(self, file_path, recipients):
+        file_url = await self.upload_file(file_path)
+        if file_url:
+            message_text = f"[File] {file_url}"
+
+            # Send to global chat if 'global' is in recipients
+            if 'global' in recipients:
+                await self.send_public_chat(message_text)
+
+            # Send to private recipients
+            private_recipients = [r for r in recipients if r != 'global']
+            if private_recipients:
+                await self.send_chat_message(private_recipients, message_text)
+        else:
+            logger.error("Failed to upload and share file.")
+
+
+    async def send_chat_message(self, recipients, message_text):
         valid_recipients = [fingerprint for fingerprint in recipients if fingerprint in self.known_clients]
         if not valid_recipients:
             logger.error("No valid recipients found.")
@@ -412,10 +419,6 @@ class Client:
 
         self.counter += 1
 
-        # Include file URL in the message text if provided
-        if file_url:
-            message_text += f" [File URL: {file_url}]"
-
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
@@ -427,14 +430,13 @@ class Client:
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
 
-
     async def send_public_chat(self, message_text):
         self.counter += 1  # Increment counter
         message = build_public_chat_message(self.public_key, self.private_key, self.counter, message_text)
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
-            
+
     async def request_client_list(self):
         message = {
             "type": "client_list_request"
@@ -442,18 +444,6 @@ class Client:
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
-    
-    async def upload_and_share_file(self, file_path):
-        file_url = await self.upload_file(file_path)
-        if file_url:
-            # Share the file URL with all known clients or selected recipients
-            # For simplicity, we'll share with all clients
-            recipients = list(self.known_clients.keys())
-            message_text = f"Shared a file: {file_url}"
-            await self.send_chat_message(recipients, message_text)
-        else:
-            logger.error("Failed to upload and share file.")
-
 
 # Create an instance of the Client
 client_instance = Client()

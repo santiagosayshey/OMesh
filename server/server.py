@@ -32,9 +32,7 @@ from common.protocol import (
 )
 from common.crypto import (
     load_public_key,
-    load_private_key,
     export_public_key,
-    export_private_key,
     calculate_fingerprint,
 )
 
@@ -43,6 +41,7 @@ SERVER_ADDRESS = os.environ.get('SERVER_ADDRESS', '0.0.0.0')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', 8765))           # Client WS port
 SERVER_SERVER_PORT = int(os.environ.get('SERVER_SERVER_PORT', 8766)) # Server WS port
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
+PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'localhost')
 
 # Parse NEIGHBOUR_ADDRESSES environment variable
 neighbour_addresses_env = os.environ.get('NEIGHBOUR_ADDRESSES', '')
@@ -86,7 +85,6 @@ class Server:
         os.makedirs(CLIENTS_DIR, exist_ok=True)
         os.makedirs(FILES_DIR, exist_ok=True)
 
-
     async def start(self):
         # Start WebSocket server for clients
         client_server = websockets.serve(
@@ -103,7 +101,7 @@ class Server:
         app.router.add_get('/files/{filename}', self.handle_file_download)
         runner = web.AppRunner(app)
         await runner.setup()
-        site = web.TCPSite(runner, self.address, self.http_port)
+        site = web.TCPSite(runner, '0.0.0.0', self.http_port)
 
         # Run all servers and connect to neighbours concurrently
         await asyncio.gather(
@@ -489,8 +487,8 @@ class Server:
     async def handle_file_upload(self, request):
         reader = await request.multipart()
         field = await reader.next()
-        if field.name != 'file':
-            return web.HTTPBadRequest(text="No file field in request")
+        if not field or field.name != 'file':
+            return web.json_response({'error': 'No file field in request'}, status=400)
         filename = field.filename
 
         # Set a maximum file size limit (e.g., 10 MB)
@@ -507,10 +505,10 @@ class Server:
                 size += len(chunk)
                 if size > max_file_size:
                     os.remove(filepath)
-                    return web.HTTPRequestEntityTooLarge()
+                    return web.json_response({'error': 'File size exceeds limit'}, status=413)
                 f.write(chunk)
 
-        file_url = f"http://{self.address}:{self.http_port}/files/{filename}"
+        file_url = f"http://{PUBLIC_HOST}:{self.http_port}/files/{filename}"
         return web.json_response({'file_url': file_url})
 
     async def handle_file_download(self, request):
