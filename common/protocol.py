@@ -117,26 +117,24 @@ def parse_message(message_str):
         return None, f"JSON decode error: {str(e)}"
 
 # Function to construct a 'hello' message
-def build_hello_message(public_key):
-    public_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    public_key_b64 = base64.b64encode(public_pem).decode('utf-8')
-
+def build_hello_message(public_key, private_key, counter):
+    """
+    Constructs a signed 'hello' message according to the protocol.
+    """
     data_dict = {
-        "type": MessageType.HELLO.value,
-        "public_key": public_key_b64
+        "type": "hello",
+        "public_key": base64.b64encode(
+            public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        ).decode('utf-8')
     }
-    message = {
-        "data": data_dict
-    }
-    return message
-
+    return build_signed_message(data_dict, private_key, counter)
 
 
 # Function to construct a 'chat' message
-def build_chat_message(destination_servers, recipients_public_keys, sender_private_key, message_text):
+def build_chat_message(destination_servers, recipients_public_keys, sender_private_key, counter, message_text):
     # Generate AES key and IV
     aes_key = generate_aes_key()
     iv = generate_iv()
@@ -164,31 +162,29 @@ def build_chat_message(destination_servers, recipients_public_keys, sender_priva
         encrypted_key_b64 = base64.b64encode(encrypted_key).decode('utf-8')
         symm_keys.append(encrypted_key_b64)
 
-    # Construct the message
-    message = {
-        "data": {
-            "type": "chat",
-            "destination_servers": destination_servers,
-            "iv": iv_b64,
-            "symm_keys": symm_keys,
-            "chat": chat_b64
-        }
+    # Construct the 'data' field
+    data_dict = {
+        "type": "chat",
+        "destination_servers": destination_servers,
+        "iv": iv_b64,
+        "symm_keys": symm_keys,
+        "chat": chat_b64
     }
 
-    return message
+    # Wrap the 'data' field in 'signed_data'
+    signed_message = build_signed_message(data_dict, sender_private_key, counter)
+    return signed_message
 
 
 # Function to construct a 'public_chat' message
-def build_public_chat_message(sender_public_key, message_text):
+def build_public_chat_message(sender_public_key, sender_private_key, counter, message_text):
     sender_fingerprint = calculate_fingerprint(sender_public_key)
-    message = {
-        "data": {
-            "type": "public_chat",
-            "sender": sender_fingerprint,
-            "message": message_text
-        }
+    data_dict = {
+        "type": "public_chat",
+        "sender": sender_fingerprint,
+        "message": message_text
     }
-    return message
+    return build_signed_message(data_dict, sender_private_key, counter)
 
 # Function to construct a 'client_list_request' message
 def build_client_list_request():

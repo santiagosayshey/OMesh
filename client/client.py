@@ -70,7 +70,7 @@ class Client:
         self.websocket = None
         self.private_key = None
         self.public_key = None
-        self.counter = 0
+        self.counter = 0  # Initialize counter to 0
         self.known_clients = {}  # {fingerprint: public_key}
         self.last_counters = {}  # {fingerprint: last_counter}
         self.incoming_messages = []
@@ -114,16 +114,8 @@ class Client:
             print(f"Failed to connect to server: {e}")
 
     async def send_hello(self):
-        public_pem = export_public_key(self.public_key)
-        public_key_b64 = base64.b64encode(public_pem).decode('utf-8')
-        data_dict = {
-            "type": "hello",
-            "public_key": public_key_b64
-        }
-        message = {
-            "type": "hello",
-            "data": data_dict
-        }
+        self.counter += 1  # Increment counter
+        message = build_hello_message(self.public_key, self.private_key, self.counter)
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         logger.info(f"Sent 'hello' message:\n{json.dumps(message, indent=2)}")
@@ -279,10 +271,12 @@ class Client:
         recipients_public_keys = [self.known_clients[fingerprint] for fingerprint in recipients if fingerprint in self.known_clients]
         destination_servers = [self.server_address]  # Assuming all recipients are on the same server
 
+        self.counter += 1  # Increment counter
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
             self.private_key,
+            self.counter,
             message_text
         )
         message_json = json.dumps(message)
@@ -290,11 +284,12 @@ class Client:
         logger.info(f"Sent chat message:\n{json.dumps(message, indent=2)}")
 
     async def send_public_chat(self, message_text):
-        message = build_public_chat_message(self.public_key, message_text)
+        self.counter += 1  # Increment counter
+        message = build_public_chat_message(self.public_key, self.private_key, self.counter, message_text)
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         logger.info(f"Sent public message:\n{json.dumps(message, indent=2)}")
-        
+            
     async def request_client_list(self):
         message = {
             "type": "client_list_request"

@@ -202,14 +202,30 @@ class Server:
                 logger.error(f"Error sending client update to server: {e}")
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
-        # Extract message_type
-        if "type" in message_dict:
-            message_type = message_dict["type"]
-        elif "data" in message_dict and "type" in message_dict["data"]:
-            message_type = message_dict["data"]["type"]
-        else:
-            print("Received message without 'type'")
+        # First, verify the message structure
+        if not validate_message_format(message_dict):
+            print("Invalid message format")
             return
+
+        message_type = None
+        if message_dict.get("type") == "signed_data":
+            message_type = message_dict["data"].get("type")
+            # Extract sender's fingerprint
+            sender_fingerprint = client_fingerprint
+            # Verify signature
+            public_key = self.client_public_keys.get(sender_fingerprint)
+            if not public_key:
+                print("Unknown sender fingerprint")
+                return
+            is_valid, error = verify_signed_message(message_dict, public_key, self.client_counters.get(sender_fingerprint, 0))
+            if not is_valid:
+                print(f"Invalid signed message: {error}")
+                return
+            # Update counter
+            counter = message_dict["counter"]
+            self.client_counters[sender_fingerprint] = counter
+        else:
+            message_type = message_dict.get("type")
 
         if message_type == 'hello':
             # Handle 'hello' message
@@ -223,15 +239,20 @@ class Server:
         else:
             print(f"Unknown message type from client: {message_type}")
 
+
     async def handle_server_message(self, websocket, message_dict):
-        # Extract message_type
-        if "type" in message_dict:
-            message_type = message_dict["type"]
-        elif "data" in message_dict and "type" in message_dict["data"]:
-            message_type = message_dict["data"]["type"]
-        else:
-            print("Received message without 'type'")
+        # Similar validation as client messages
+        if not validate_message_format(message_dict):
+            print("Invalid message format from server")
             return
+
+        message_type = None
+        if message_dict.get("type") == "signed_data":
+            message_type = message_dict["data"].get("type")
+            # Assuming server authentication is handled elsewhere
+            # Implement signature verification if servers sign their messages
+        else:
+            message_type = message_dict.get("type")
 
         if message_type == 'client_update':
             # Update internal client list
@@ -240,9 +261,9 @@ class Server:
                 public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
                 public_key = load_public_key(public_key_pem)
                 fingerprint = calculate_fingerprint(public_key)
-                # Assuming clients connected to other servers are not directly connected here
+                # Update or add to client_public_keys
                 self.client_public_keys[fingerprint] = public_key
-                # No websocket connection for clients on other servers
+                # Depending on implementation, you might want to track which server the client belongs to
         elif message_type == 'client_update_request':
             # Send client update to requesting server
             await self.broadcast_client_update()
