@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 function OlafChatClient() {
   const [userFingerprint, setUserFingerprint] = useState("");
   const [userName, setUserName] = useState("");
+  const [serverAddress, setServerAddress] = useState(""); // Added serverAddress
+  const [serverPort, setServerPort] = useState(""); // Added serverPort
   const [selectedRecipients, setSelectedRecipients] = useState(["global"]);
   const [clients, setClients] = useState([]);
   const [storedMessages, setStoredMessages] = useState([]);
@@ -14,13 +16,15 @@ function OlafChatClient() {
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Fetch user fingerprint and name on component mount
+  // Fetch user fingerprint, name, and server info on component mount
   useEffect(() => {
     fetch("/get_fingerprint")
       .then((response) => response.json())
       .then((data) => {
         setUserFingerprint(data.fingerprint);
         setUserName(data.name);
+        setServerAddress(data.server_address); // Set serverAddress
+        setServerPort(data.server_port); // Set serverPort
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
@@ -285,6 +289,19 @@ function OlafChatClient() {
       <div className="container mx-auto px-4 py-8 flex flex-col flex-grow">
         <h1 className="text-3xl font-bold mb-4">OLAF Chat Client</h1>
 
+        {/* Client info */}
+        <div className="mb-4">
+          <p>
+            <strong>Name:</strong> {userName}
+          </p>
+          <p>
+            <strong>Fingerprint:</strong> {userFingerprint}
+          </p>
+          <p>
+            <strong>Connected to Server:</strong> {serverAddress}:{serverPort}
+          </p>
+        </div>
+
         {/* Message pane */}
         <div className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg">
           {storedMessages.map((message, index) => {
@@ -310,7 +327,7 @@ function OlafChatClient() {
                     ) : (
                       <>
                         <span className="mr-2">
-                          {getFileTypeIcon(messageContent)}
+                          {/* File icon can be added here */}
                         </span>
                         <a
                           href={messageContent}

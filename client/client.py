@@ -84,6 +84,7 @@ def sanitize_message(message):
 class Client:
     def __init__(self):
         self.server_address = SERVER_ADDRESS
+        self.server_port = SERVER_PORT  # Added server_port
         self.websocket = None
         self.private_key = None
         self.public_key = None
@@ -342,7 +343,9 @@ class Client:
         fingerprint = calculate_fingerprint(client_instance.public_key)
         return jsonify({
             'fingerprint': fingerprint,
-            'name': client_instance.name
+            'name': client_instance.name,
+            'server_address': client_instance.server_address,
+            'server_port': client_instance.server_port
         })
 
     @app.route('/upload_file', methods=['POST'])
@@ -392,7 +395,6 @@ class Client:
                 await self.send_chat_message(private_recipients, message_text)
         else:
             logger.error("Failed to upload and share file.")
-
 
     async def send_chat_message(self, recipients, message_text):
         valid_recipients = [fingerprint for fingerprint in recipients if fingerprint in self.known_clients]
