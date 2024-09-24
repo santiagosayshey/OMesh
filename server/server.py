@@ -283,8 +283,11 @@ class Server:
                 counter = message_dict["counter"]
                 self.client_counters[sender_fingerprint] = counter
 
-                # Forward the message
-                await self.forward_message(message_dict)
+                # Handle the message based on its type
+                if data_type == 'chat':
+                    await self.forward_message(message_dict)
+                elif data_type == 'public_chat':
+                    await self.handle_public_chat(message_dict)
             else:
                 print(f"Unknown data type in signed_data message: {data_type}")
 
@@ -350,12 +353,13 @@ class Server:
             self.servers[sender_address] = websocket  # Update the servers dict
             logger.info(f"Mapped websocket to server {sender_address}.")
 
-            # Optionally, send a client_update_request if not already sent
-            # await self.broadcast_client_update()
-
         elif message_type in [MessageType.CHAT.value, MessageType.PUBLIC_CHAT.value]:
             # Handle chat messages
-            await self.forward_message(message_dict)
+            if message_type == MessageType.PUBLIC_CHAT.value:
+                # For public chat from other servers, only deliver to clients, don't forward
+                await self.deliver_message_to_clients(message_dict)
+            else:
+                await self.forward_message(message_dict)
 
         else:
             print(f"Unknown message type from server: {message_type}")
@@ -467,6 +471,20 @@ class Server:
             logger.info("Sent 'client_list' response to client.")
         except Exception as e:
             logger.error(f"Error sending client list to client: {e}")
+
+    async def handle_public_chat(self, message_dict):
+        # Deliver to all clients on this server
+        await self.deliver_message_to_clients(message_dict)
+        
+        # Forward to all other servers, but only once
+        message_json = json.dumps(message_dict)
+        for server_address, websocket in self.servers.items():
+            try:
+                await websocket.send(message_json)
+                log_message("Forwarded", message_json)
+                logger.info(f"Forwarded public chat to server {server_address}.")
+            except Exception as e:
+                logger.error(f"Error forwarding public chat to server {server_address}: {e}")
 
     async def handle_file_upload(self, request):
         reader = await request.multipart()
