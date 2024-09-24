@@ -287,7 +287,10 @@ function OlafChatClient() {
   return (
     <div className="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
       <div className="container mx-auto px-4 py-8 flex flex-col flex-grow">
-        <h1 className="text-3xl font-bold mb-4">OLAF Chat Client</h1>
+        {/* Header section without the description */}
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold">OMesh</h1>
+        </div>
 
         {/* Client info */}
         <div className="mb-4">
@@ -328,6 +331,7 @@ function OlafChatClient() {
                       <>
                         <span className="mr-2">
                           {/* File icon can be added here */}
+                          {getFileTypeIcon(messageContent)}
                         </span>
                         <a
                           href={messageContent}
@@ -481,6 +485,37 @@ function OlafChatClient() {
           </div>
         </div>
       </div>
+
+      {/* Footer section */}
+      <footer className="text-white-400 py-4 text-center">
+        <span className="text-sm">
+          An open source implementation of OLAF's Neighbourhood protocol,
+          developed in Python and React.
+        </span>
+        <a
+          href="https://github.com/santiagosayshey/OMesh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center ml-2 text-white-400 hover:text-blue-300"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4 ml-1"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            role="img"
+            focusable="false"
+          >
+            <title>GitHub Repository</title>
+            <path
+              fillRule="evenodd"
+              d="M12 0C5.372 0 0 5.373 0 12c0 5.303 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.73.083-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.305-5.467-1.332-5.467-5.93 0-1.31.468-2.381 1.235-3.221-.123-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.3 1.23a11.52 11.52 0 013.003-.404c1.02.005 2.045.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.241 2.874.119 3.176.77.84 1.233 1.911 1.233 3.221 0 4.61-2.807 5.625-5.48 5.92.43.372.823 1.102.823 2.222v3.293c0 .322.218.694.825.576C20.565 21.796 24 17.3 24 12c0-6.627-5.373-12-12-12z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </a>
+      </footer>
     </div>
   );
 }
