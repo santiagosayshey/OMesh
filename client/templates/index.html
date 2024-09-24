@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OLAF Chat Client</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  </head>
+  <body>
+    <h1>OLAF Chat Client</h1>
+
+    <div>
+      <button id="refresh-clients">Refresh Client List</button>
+      <button id="refresh-messages">Refresh Messages</button>
+      <button id="request-client-list">Request Client List</button>
+    </div>
+
+    <h2>Your Fingerprint</h2>
+    <p id="user-fingerprint">Loading...</p>
+
+    <h2>Online Clients</h2>
+    <ul id="client-list"></ul>
+
+    <h2>Send Message</h2>
+    <textarea id="message-text" rows="4" cols="50"></textarea><br />
+    <label>Recipients (comma-separated fingerprints):</label><br />
+    <input type="text" id="recipients" /><br />
+    <button id="send-message">Send Private Message</button>
+    <button id="send-public-message">Send Public Message</button>
+
+    <h2>Messages</h2>
+    <ul id="message-list"></ul>
+
+    <script>
+      let userFingerprint = "";
+
+      function refreshClients() {
+        console.log("Refreshing clients...");
+        $.getJSON("/get_clients")
+          .done(function (data) {
+            console.log("Received client data:", data);
+            var clients = data.clients;
+            var clientList = $("#client-list");
+            clientList.empty();
+            clients.forEach(function (fingerprint) {
+              if (fingerprint !== userFingerprint) {
+                clientList.append("<li>" + fingerprint + "</li>");
+              }
+            });
+          })
+          .fail(function (jqXHR, textStatus, errorThrown) {
+            console.error("Error refreshing clients:", textStatus, errorThrown);
+          });
+      }
+
+      function refreshMessages() {
+        console.log("Refreshing messages...");
+        $.getJSON("/get_messages")
+          .done(function (data) {
+            console.log("Received message data:", data);
+            var messages = data.messages;
+            var messageList = $("#message-list");
+            messages.forEach(function (msg) {
+              messageList.append(
+                "<li><strong>" +
+                  (msg.sender === userFingerprint ? "You" : msg.sender) +
+                  ":</strong> " +
+                  msg.message +
+                  "</li>"
+              );
+            });
+          })
+          .fail(function (jqXHR, textStatus, errorThrown) {
+            console.error(
+              "Error refreshing messages:",
+              textStatus,
+              errorThrown
+            );
+          });
+      }
+
+      $(document).ready(function () {
+        // Get user's fingerprint and name
+        $.getJSON("/get_fingerprint")
+          .done(function (data) {
+            userFingerprint = data.fingerprint;
+            userName = data.name;
+            $("#user-fingerprint").text(
+              userFingerprint + " (" + userName + ")"
+            );
+          })
+          .fail(function (jqXHR, textStatus, errorThrown) {
+            console.error(
+              "Error getting fingerprint:",
+              textStatus,
+              errorThrown
+            );
+          });
+
+        $("#refresh-clients").click(refreshClients);
+        $("#refresh-messages").click(refreshMessages);
+
+        $("#request-client-list").click(function () {
+          console.log("Requesting client list...");
+          $.get("/request_client_list")
+            .done(function (data) {
+              console.log("Client list request response:", data);
+              alert(data.status);
+              // Automatically refresh the client list after requesting
+              refreshClients();
+            })
+            .fail(function (jqXHR, textStatus, errorThrown) {
+              console.error(
+                "Error requesting client list:",
+                textStatus,
+                errorThrown
+              );
+            });
+        });
+
+        $("#send-message").click(function () {
+          var message = $("#message-text").val();
+          var recipients = $("#recipients")
+            .val()
+            .split(",")
+            .map(function (s) {
+              return s.trim();
+            });
+          console.log(
+            "Sending private message:",
+            message,
+            "to recipients:",
+            recipients
+          );
+          $.ajax({
+            url: "/send_message",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ message: message, recipients: recipients }),
+            success: function (data) {
+              console.log("Message sent response:", data);
+              alert(data.status);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              console.error("Error sending message:", textStatus, errorThrown);
+            },
+          });
+        });
+
+        $("#send-public-message").click(function () {
+          var message = $("#message-text").val();
+          console.log("Sending public message:", message);
+          $.ajax({
+            url: "/send_public_message",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ message: message }),
+            success: function (data) {
+              console.log("Public message sent response:", data);
+              alert(data.status);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              console.error(
+                "Error sending public message:",
+                textStatus,
+                errorThrown
+              );
+            },
+          });
+        });
+
+        // Initial client list refresh
+        refreshClients();
+      });
+    </script>
+  </body>
+</html>
