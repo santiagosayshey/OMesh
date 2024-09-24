@@ -8,6 +8,7 @@ function OlafChatClient() {
   const [storedMessages, setStoredMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const dropdownRef = useRef(null);
 
@@ -152,6 +153,35 @@ function OlafChatClient() {
     setMessageText("");
   };
 
+  // Handle file selection
+  const handleFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
+  };
+
+  // Handle file upload
+  const handleFileUpload = () => {
+    if (!selectedFile) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    fetch("/upload_file", {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("File upload response:", data);
+        // Clear selected file after upload
+        setSelectedFile(null);
+      })
+      .catch((error) => {
+        console.error("Error uploading file:", error);
+      });
+  };
+
   // Handle click outside the dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -177,15 +207,49 @@ function OlafChatClient() {
 
         {/* Message pane */}
         <div className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg">
-          {storedMessages.map((message, index) => (
-            <div key={index} className="mb-2">
-              <strong>{message.sender}:</strong> {message.message}
-            </div>
-          ))}
+          {storedMessages.map((message, index) => {
+            const fileUrlMatch = message.message.match(/\[File URL: (.+?)\]/);
+            const messageText = message.message
+              .replace(/\[File URL: .+?\]/, "")
+              .trim();
+            const fileUrl = fileUrlMatch ? fileUrlMatch[1] : null;
+
+            return (
+              <div key={index} className="mb-2">
+                <strong>{message.sender}:</strong> {messageText}
+                {fileUrl && (
+                  <div>
+                    <a
+                      href={fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 underline"
+                    >
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Message input area */}
         <div className="mt-4">
+          {/* File upload section */}
+          <div className="mb-4">
+            <input
+              type="file"
+              onChange={handleFileChange}
+              className="text-white"
+            />
+            <button
+              onClick={handleFileUpload}
+              className="text-white bg-green-600 hover:bg-green-500 rounded-full px-3 py-1 focus:outline-none ml-2"
+            >
+              Upload File
+            </button>
+          </div>
           <div className="relative">
             <div className="flex items-center bg-gray-800 text-white rounded-full px-4 py-3">
               <div className="relative" ref={dropdownRef}>

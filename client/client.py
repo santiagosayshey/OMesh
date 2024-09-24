@@ -6,6 +6,7 @@ import websockets
 import threading
 import base64
 import os
+import aiohttp
 
 from flask import Flask, render_template, request, jsonify
 from flask_sock import Sock
@@ -60,6 +61,8 @@ CLIENT_WS_URI = f'ws://{SERVER_ADDRESS}:{SERVER_PORT}'
 app = Flask(__name__)
 sock = Sock(app)
 
+os.makedirs('uploads', exist_ok=True)
+
 def log_message(direction, message):
     # Always log the basic message direction
     logger.info(f"{direction} message.")
@@ -101,6 +104,7 @@ class Client:
         self.last_counters = {}  # {fingerprint: last_counter}
         self.incoming_messages = []
         self.name = CLIENT_NAME
+        self.http_port = int(os.environ.get('HTTP_PORT', 8081))
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -352,7 +356,38 @@ class Client:
             'name': client_instance.name
         })
 
-    async def send_chat_message(self, recipients, message_text):
+    @app.route('/upload_file', methods=['POST'])
+    def upload_file_route():
+        file = request.files['file']
+        if file:
+            filename = file.filename
+            file_path = os.path.join('uploads', filename)
+            file.save(file_path)
+            asyncio.run_coroutine_threadsafe(
+                client_instance.upload_and_share_file(file_path),
+                client_instance.loop
+            )
+            return jsonify({'status': 'File uploaded and shared'})
+        else:
+            return jsonify({'status': 'No file provided'}), 400
+
+    
+    async def upload_file(self, file_path):
+        url = f'http://{self.server_address}:{self.http_port}/api/upload'
+        async with aiohttp.ClientSession() as session:
+            with open(file_path, 'rb') as f:
+                form = aiohttp.FormData()
+                form.add_field('file', f, filename=os.path.basename(file_path))
+                async with session.post(url, data=form) as resp:
+                    if resp.status == 200:
+                        json_response = await resp.json()
+                        file_url = json_response.get('file_url')
+                        return file_url
+                    else:
+                        logger.error(f"File upload failed with status {resp.status}")
+                        return None
+
+    async def send_chat_message(self, recipients, message_text, file_url=None):
         valid_recipients = [fingerprint for fingerprint in recipients if fingerprint in self.known_clients]
         if not valid_recipients:
             logger.error("No valid recipients found.")
@@ -376,6 +411,11 @@ class Client:
         logger.info(f"Sending message to servers: {destination_servers}")
 
         self.counter += 1
+
+        # Include file URL in the message text if provided
+        if file_url:
+            message_text += f" [File URL: {file_url}]"
+
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
@@ -386,6 +426,7 @@ class Client:
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
+
 
     async def send_public_chat(self, message_text):
         self.counter += 1  # Increment counter
@@ -401,6 +442,18 @@ class Client:
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
+    
+    async def upload_and_share_file(self, file_path):
+        file_url = await self.upload_file(file_path)
+        if file_url:
+            # Share the file URL with all known clients or selected recipients
+            # For simplicity, we'll share with all clients
+            recipients = list(self.known_clients.keys())
+            message_text = f"Shared a file: {file_url}"
+            await self.send_chat_message(recipients, message_text)
+        else:
+            logger.error("Failed to upload and share file.")
+
 
 # Create an instance of the Client
 client_instance = Client()
