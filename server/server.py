@@ -65,11 +65,13 @@ class Server:
         self.client_counters = {}  # {fingerprint: last_counter}
         self.servers = {}  # {address: websocket}
         self.server_public_keys = {}  # {address: public_key}
+        self.fingerprint_to_server = {}  # Initialize the attribute
         self.loop = asyncio.get_event_loop()
 
         # Ensure directories exist
         os.makedirs(CLIENTS_DIR, exist_ok=True)
         os.makedirs(FILES_DIR, exist_ok=True)
+
 
     async def start(self):
         # Start WebSocket server for clients
