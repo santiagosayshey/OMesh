@@ -260,39 +260,50 @@ class Server:
             print(f"Unknown message type from client: {message_type}")
 
     async def handle_server_message(self, websocket, message_dict):
-        # Similar validation as client messages
+        # Validate the message structure
         if not validate_message_format(message_dict):
             print("Invalid message format from server")
             return
 
-        message_type = message_dict.get("type")
+        # Determine if 'type' is within 'data' or at the top level
+        if "data" in message_dict and "type" in message_dict["data"]:
+            # Extract 'type' from within 'data'
+            data = message_dict.get("data", {})
+            message_type = data.get("type")
+        else:
+            # Extract 'type' from the top level
+            message_type = message_dict.get("type")
 
         if message_type == MessageType.CLIENT_UPDATE.value:
-            # Update internal client list
+            # Handle client_update
             clients_b64 = message_dict.get('clients', [])
             for public_key_b64 in clients_b64:
                 public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
                 public_key = load_public_key(public_key_pem)
                 fingerprint = calculate_fingerprint(public_key)
-                # Update or add to client_public_keys
                 self.client_public_keys[fingerprint] = public_key
-                # Assign to the server sending the update
-                self.fingerprint_to_server[fingerprint] = 'Unknown'  # Placeholder
+                # Assign to the server sending the update if known
+                self.fingerprint_to_server[fingerprint] = 'Unknown'  # Update as necessary
             logger.info("Updated client list from server.")
 
         elif message_type == MessageType.CLIENT_UPDATE_REQUEST.value:
-            # Send client update to requesting server
+            # Handle client_update_request
+            logger.info("Received 'client_update_request' from server.")
             await self.broadcast_client_update()
+
         elif message_type == MessageType.SERVER_HELLO.value:
-            # Handle server hello
+            # Handle server_hello
             sender_address = message_dict["data"].get("sender")
             logger.info(f"Received 'server_hello' from {sender_address}")
-            # Optionally, store server's fingerprint or public key if available
-        elif message_type == MessageType.CHAT.value or message_type == MessageType.PUBLIC_CHAT.value:
-            # Forward message to destination servers or clients
+            # Further processing if needed...
+
+        elif message_type in [MessageType.CHAT.value, MessageType.PUBLIC_CHAT.value]:
+            # Handle chat messages
             await self.forward_message(message_dict)
+
         else:
             print(f"Unknown message type from server: {message_type}")
+
 
     async def forward_message(self, message_dict):
         data = message_dict.get('data', {})

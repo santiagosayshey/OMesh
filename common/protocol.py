@@ -244,10 +244,10 @@ def build_server_hello(sender_address):
         "sender": sender_address
     }
     message = {
-        "type": MessageType.SERVER_HELLO.value,
-        "data": data_dict
+        "data": data_dict  # Removed the top-level "type"
     }
     return message
+
 
 # Function to validate the structure of a received message
 def validate_message_format(message_dict):
