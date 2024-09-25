@@ -255,41 +255,82 @@ def validate_message_format(message_dict):
     Validates that the message has the required fields according to its type.
     Returns True if valid, False otherwise.
     """
-    if "type" in message_dict:
-        message_type = message_dict["type"]
-    elif "data" in message_dict and "type" in message_dict["data"]:
-        message_type = message_dict["data"]["type"]
-    else:
-        print("Validation Error: Message missing 'type' field.")
-        return False
-
-    # Define required fields based on message_type
-    if message_type == "signed_data":
-        required_fields = ["data", "counter", "signature"]
-    elif message_type == "client_list_request":
-        required_fields = []
-    elif message_type == "client_update":
-        required_fields = ["clients"]
-    elif message_type == "client_list":
-        required_fields = ["servers"]
-    elif message_type == "client_update_request":
-        required_fields = []
-    elif message_type == "hello":
-        required_fields = ["data"]
-    elif message_type == "server_hello":
-        required_fields = ["data"]
-    elif message_type == "chat":
-        required_fields = ["data"]
-    elif message_type == "public_chat":
-        required_fields = ["data"]
-    else:
-        print(f"Validation Error: Unknown message type '{message_type}'.")
-        return False
-
-    # Check for required fields
-    for field in required_fields:
-        if field not in message_dict:
-            print(f"Validation Error: Message missing required field '{field}'.")
+    try:
+        # Determine the message type
+        if "type" in message_dict:
+            message_type = message_dict["type"]
+        elif "data" in message_dict and "type" in message_dict["data"]:
+            message_type = message_dict["data"]["type"]
+        else:
+            print("Validation Error: Message missing 'type' field.")
             return False
 
-    return True
+        # Define required fields based on message_type
+        if message_type == "signed_data":
+            required_fields = ["data", "counter", "signature"]
+            # Check for required fields in the top-level message
+            for field in required_fields:
+                if field not in message_dict:
+                    print(f"Validation Error: Message missing required field '{field}'.")
+                    return False
+
+            # Now check the nested 'data' field
+            data = message_dict.get("data", {})
+            if "type" not in data:
+                print("Validation Error: Signed message 'data' missing 'type' field.")
+                return False
+
+            data_type = data["type"]
+            if data_type == "hello":
+                required_data_fields = ["type", "public_key"]
+            elif data_type == "chat":
+                required_data_fields = ["type", "destination_servers", "iv", "symm_keys", "chat"]
+            elif data_type == "public_chat":
+                required_data_fields = ["type", "sender", "message"]
+            elif data_type == "server_hello":
+                required_data_fields = ["type", "sender"]
+            else:
+                print(f"Validation Error: Unknown signed data type '{data_type}'.")
+                return False
+
+            for field in required_data_fields:
+                if field not in data:
+                    print(f"Validation Error: Signed message 'data' missing required field '{field}'.")
+                    return False
+
+        elif message_type == "client_list_request":
+            required_fields = ["type"]
+            for field in required_fields:
+                if field not in message_dict:
+                    print(f"Validation Error: Message missing required field '{field}'.")
+                    return False
+
+        elif message_type == "client_update":
+            required_fields = ["type", "clients"]
+            for field in required_fields:
+                if field not in message_dict:
+                    print(f"Validation Error: Message missing required field '{field}'.")
+                    return False
+
+        elif message_type == "client_list":
+            required_fields = ["type", "servers"]
+            for field in required_fields:
+                if field not in message_dict:
+                    print(f"Validation Error: Message missing required field '{field}'.")
+                    return False
+
+        elif message_type == "client_update_request":
+            required_fields = ["type"]
+            for field in required_fields:
+                if field not in message_dict:
+                    print(f"Validation Error: Message missing required field '{field}'.")
+                    return False
+
+        else:
+            print(f"Validation Error: Unknown message type '{message_type}'.")
+            return False
+
+        return True
+    except Exception as e:
+        print(f"Validation Error: Exception occurred - {e}")
+        return False
