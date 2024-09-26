@@ -15,8 +15,8 @@ htmlcov/
 *.log
 
 # Build directories
-frontend/build/
-client/templates/
+frontend/build
+client/templates
 client/static/assets
 
 # File upload folders
@@ -27,3 +27,4 @@ uploads/
 # Key files
 private_key.pem
 public_key.pem
+frontend/build/index.html
