@@ -192,6 +192,12 @@ class Client:
                 f.write(public_pem)
             logger.info("Generated new key pair and saved to config directory.")
 
+        # Add your own public key to known_clients
+        fingerprint = calculate_fingerprint(self.public_key)
+        self.known_clients[fingerprint] = self.public_key
+        self.fingerprint_to_server[fingerprint] = self.server_address  # Assuming you're connected to your own server
+
+        logger.info("Added own public key to known_clients.")
 
     async def connect_to_server(self):
         max_retries = 10
@@ -541,6 +547,11 @@ class Client:
             logger.error("Failed to upload and share file.")
 
     async def send_chat_message(self, recipients, message_text):
+        # Include the sender's own fingerprint
+        my_fingerprint = calculate_fingerprint(self.public_key)
+        if my_fingerprint not in recipients:
+            recipients.append(my_fingerprint)
+
         valid_recipients = [fingerprint for fingerprint in recipients if fingerprint in self.known_clients]
         if not valid_recipients:
             logger.error("No valid recipients found.")

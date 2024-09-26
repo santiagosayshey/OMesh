@@ -1,3 +1,5 @@
+// client/src/OlafChatClient.js
+
 import React, { useState, useEffect, useRef } from "react";
 
 function OlafChatClient() {
@@ -78,7 +80,7 @@ function OlafChatClient() {
     }
   }, [storedMessages]);
 
-  // Set up automatic refresh for messages every 10 seconds
+  // Set up automatic refresh for messages every 5 seconds
   useEffect(() => {
     // Initial refresh
     refreshClients(); // Fetch clients on mount
@@ -86,7 +88,7 @@ function OlafChatClient() {
 
     const interval = setInterval(() => {
       refreshMessages();
-    }, 10000);
+    }, 5000); // Refresh every 5 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -127,6 +129,8 @@ function OlafChatClient() {
         .then((response) => response.json())
         .then((data) => {
           console.log("Public message sent response:", data);
+          // Fetch messages immediately after sending
+          refreshMessages();
         })
         .catch((error) => {
           console.error("Error sending public message:", error);
@@ -154,6 +158,8 @@ function OlafChatClient() {
         .then((response) => response.json())
         .then((data) => {
           console.log("Private message sent response:", data);
+          // Fetch messages immediately after sending
+          refreshMessages();
         })
         .catch((error) => {
           console.error("Error sending message:", error);
@@ -192,6 +198,8 @@ function OlafChatClient() {
           if (response.ok) {
             const data = await response.json();
             console.log("File upload response:", data);
+            // Fetch messages immediately after sending
+            refreshMessages();
           } else {
             // Handle errors
             const errorData = await response.json();
