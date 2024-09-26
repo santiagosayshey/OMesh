@@ -10,8 +10,10 @@ services:
       - "8766:8766" # WebSocket port for servers
       - "8081:8081" # HTTP port for file transfers
     volumes:
-      - ./server/clients1:/app/server/clients
-      - ./server/files1:/app/server/files
+      - clients1:/app/server/clients
+      - files1:/app/server/files
+      - config1:/app/server/config
+      - neighbours:/app/server/neighbours
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
@@ -33,8 +35,10 @@ services:
       - "8768:8766" # WebSocket port for servers
       - "8082:8081" # HTTP port for file transfers
     volumes:
-      - ./server/clients2:/app/server/clients
-      - ./server/files2:/app/server/files
+      - clients2:/app/server/clients
+      - files2:/app/server/files
+      - config2:/app/server/config
+      - neighbours:/app/server/neighbours
     environment:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
@@ -56,8 +60,10 @@ services:
       - "8770:8766" # WebSocket port for servers
       - "8083:8081" # HTTP port for file transfers
     volumes:
-      - ./server/clients3:/app/server/clients
-      - ./server/files3:/app/server/files
+      - clients3:/app/server/clients
+      - files3:/app/server/files
+      - config3:/app/server/config
+      - neighbours:/app/server/neighbours
     environment:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
@@ -79,8 +85,10 @@ services:
       - "8772:8766" # WebSocket port for servers
       - "8084:8081" # HTTP port for file transfers
     volumes:
-      - ./server/clients4:/app/server/clients
-      - ./server/files4:/app/server/files
+      - clients4:/app/server/clients
+      - files4:/app/server/files
+      - config4:/app/server/config
+      - neighbours:/app/server/neighbours
     environment:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
@@ -99,6 +107,8 @@ services:
     container_name: olaf_client1
     ports:
       - "5001:5000"
+    volumes:
+      - config_client1:/app/client/config
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
@@ -116,6 +126,8 @@ services:
     container_name: olaf_client2
     ports:
       - "5002:5000"
+    volumes:
+      - config_client2:/app/client/config
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
@@ -133,6 +145,8 @@ services:
     container_name: olaf_client3
     ports:
       - "5003:5000"
+    volumes:
+      - config_client3:/app/client/config
     environment:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
@@ -150,6 +164,8 @@ services:
     container_name: olaf_client4
     ports:
       - "5004:5000"
+    volumes:
+      - config_client4:/app/client/config
     environment:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
@@ -167,6 +183,8 @@ services:
     container_name: olaf_client5
     ports:
       - "5005:5000"
+    volumes:
+      - config_client5:/app/client/config
     environment:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
@@ -184,6 +202,8 @@ services:
     container_name: olaf_client6
     ports:
       - "5006:5000"
+    volumes:
+      - config_client6:/app/client/config
     environment:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
@@ -201,6 +221,8 @@ services:
     container_name: olaf_client7
     ports:
       - "5007:5000"
+    volumes:
+      - config_client7:/app/client/config
     environment:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
@@ -218,6 +240,8 @@ services:
     container_name: olaf_client8
     ports:
       - "5008:5000"
+    volumes:
+      - config_client8:/app/client/config
     environment:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
@@ -227,6 +251,32 @@ services:
       - olaf_network
     depends_on:
       - server4
+
+volumes:
+  # server
+  clients1:
+  clients2:
+  clients3:
+  clients4:
+  files1:
+  files2:
+  files3:
+  files4:
+  config1:
+  config2:
+  config3:
+  config4:
+  # shared neighbourhood
+  neighbours:
+  # client
+  config_client1:
+  config_client2:
+  config_client3:
+  config_client4:
+  config_client5:
+  config_client6:
+  config_client7:
+  config_client8:
 
 networks:
   olaf_network:

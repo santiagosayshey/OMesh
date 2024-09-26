@@ -238,15 +238,12 @@ def build_client_list(servers_clients_dict):
     return message
 
 # Function to construct a 'server_hello' message
-def build_server_hello(sender_address):
+def build_server_hello(sender_address, private_key, counter):
     data_dict = {
         "type": MessageType.SERVER_HELLO.value,
         "sender": sender_address
     }
-    message = {
-        "data": data_dict  # Removed the top-level "type"
-    }
-    return message
+    return build_signed_message(data_dict, private_key, counter)
 
 
 # Function to validate the structure of a received message

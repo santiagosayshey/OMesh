@@ -34,6 +34,9 @@ from common.crypto import (
     load_public_key,
     export_public_key,
     calculate_fingerprint,
+    generate_rsa_key_pair,
+    load_private_key,
+    export_private_key
 )
 
 # Read environment variables
@@ -57,6 +60,8 @@ if neighbour_addresses_env:
 # Paths for storing client public keys and uploaded files
 CLIENTS_DIR = 'clients'
 FILES_DIR = 'files'
+CONFIG_DIR = 'config'
+NEIGHBOURS_DIR = 'neighbours'
 
 class Server:
     def __init__(self, address, client_ws_port, server_ws_port, http_port, neighbours):
@@ -78,14 +83,88 @@ class Server:
         # Mapping of client fingerprints to their respective servers
         self.fingerprint_to_server = {}  # {fingerprint: server_address}
 
-        # Initialize the event loop
-        self.loop = asyncio.get_event_loop()
+        # Generate public/private key pair and write public key to 'neighbours' directory
+        self.private_key, self.public_key = self.load_or_generate_keys()
 
         # Ensure directories exist
         os.makedirs(CLIENTS_DIR, exist_ok=True)
         os.makedirs(FILES_DIR, exist_ok=True)
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        os.makedirs(NEIGHBOURS_DIR, exist_ok=True)  # Ensure the 'neighbours' directory exists
+
+        # Write the public key to the 'neighbours' directory
+        self.write_public_key_to_neighbours()
+
+        # Initialize counters for servers
+        self.server_counters = {}
+        self.counter = 0  # Initialize server's own counter
+
+        # Initialize the event loop
+        self.loop = asyncio.get_event_loop()
+
+    def load_or_generate_keys(self):
+        private_key_path = os.path.join(CONFIG_DIR, 'server_private_key.pem')
+        public_key_path = os.path.join(CONFIG_DIR, 'server_public_key.pem')
+
+        if os.path.exists(private_key_path) and os.path.exists(public_key_path):
+            with open(private_key_path, 'rb') as f:
+                private_pem = f.read()
+            with open(public_key_path, 'rb') as f:
+                public_pem = f.read()
+            private_key = load_private_key(private_pem)
+            public_key = load_public_key(public_pem)
+            logger.info("Loaded existing key pair from config directory.")
+        else:
+            private_key, public_key = generate_rsa_key_pair()
+            private_pem = export_private_key(private_key)
+            with open(private_key_path, 'wb') as f:
+                f.write(private_pem)
+            public_pem = export_public_key(public_key)
+            with open(public_key_path, 'wb') as f:
+                f.write(public_pem)
+            logger.info("Generated new key pair and saved to config directory.")
+
+        return private_key, public_key
+
+    def write_public_key_to_neighbours(self):
+        public_pem = export_public_key(self.public_key)
+        neighbours_dir = NEIGHBOURS_DIR
+        os.makedirs(neighbours_dir, exist_ok=True)
+        key_filename = f'{self.address}_{self.server_ws_port}_public_key.pem'
+        key_filepath = os.path.join(neighbours_dir, key_filename)
+        with open(key_filepath, 'wb') as f:
+            f.write(public_pem)
+        logger.info(f"Written public key to neighbours directory: {key_filepath}")
+
+    def load_neighbour_public_keys(self):
+        """
+        Loads the public keys of neighbour servers from files.
+        The files should be named as '<address>_<port>_public_key.pem' and stored in 'neighbours' directory.
+        """
+        neighbour_public_keys = {}
+        neighbours_dir = NEIGHBOURS_DIR
+        os.makedirs(neighbours_dir, exist_ok=True)  # Ensure the directory exists
+
+        for address, port in self.neighbour_addresses:
+            key_filename = f'{address}_{port}_public_key.pem'
+            key_filepath = os.path.join(neighbours_dir, key_filename)
+            if os.path.exists(key_filepath):
+                with open(key_filepath, 'rb') as f:
+                    public_pem = f.read()
+                public_key = load_public_key(public_pem)
+                neighbour_public_keys[(address, port)] = public_key
+                logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
+            else:
+                logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
+        return neighbour_public_keys
 
     async def start(self):
+        # Introduce a delay to allow other servers to write their public keys
+        await asyncio.sleep(5)  # Wait for 5 seconds (adjust as needed)
+
+        # Now load neighbor public keys
+        self.neighbour_public_keys = self.load_neighbour_public_keys()
+
         # Start WebSocket server for clients
         client_server = websockets.serve(
             self.handle_client_connection, self.address, self.client_ws_port, ping_interval=None
@@ -110,6 +189,61 @@ class Server:
             site.start(),
             self.connect_to_neighbours(),
         )
+
+    async def connect_to_neighbours(self):
+        await asyncio.sleep(1)  # Wait to ensure servers are up
+        for address, port in self.neighbour_addresses:
+            try:
+                uri = f"ws://{address}:{port}"
+                websocket = await websockets.connect(uri)
+                self.servers[address] = websocket
+                self.websocket_to_server[websocket] = address
+                logger.info(f"Connected to server at {address}:{port}")
+
+                # Send 'server_hello' with signature and counter
+                self.counter += 1  # Increment server's own counter
+                server_hello_message = build_server_hello(self.address, self.private_key, self.counter)
+                server_hello_json = json.dumps(server_hello_message)
+                await websocket.send(server_hello_json)
+                log_message("Sent", server_hello_json)
+
+                # Request client updates
+                client_update_request = build_client_update_request()
+                client_update_request_json = json.dumps(client_update_request)
+                await websocket.send(client_update_request_json)
+                log_message("Sent", client_update_request_json)
+
+                # Start listening to this server
+                asyncio.ensure_future(self.listen_to_server(websocket))
+            except Exception as e:
+                logger.error(f"Failed to connect to server at {address}:{port}: {e}")
+
+    def get_neighbour_public_key(self, sender_address):
+        """
+        Retrieves the public key of a neighbour server based on the sender's address.
+        If not found in memory, attempts to load it from the 'neighbours' directory.
+        """
+        # Check if the public key is already loaded
+        for (address, port), public_key in self.neighbour_public_keys.items():
+            if sender_address == address or sender_address == f"{address}:{port}":
+                return public_key
+
+        # Attempt to load the public key from the 'neighbours' directory
+        for address, port in self.neighbour_addresses:
+            if sender_address == address or sender_address == f"{address}:{port}":
+                key_filename = f'{address}_{port}_public_key.pem'
+                key_filepath = os.path.join(NEIGHBOURS_DIR, key_filename)
+                if os.path.exists(key_filepath):
+                    with open(key_filepath, 'rb') as f:
+                        public_pem = f.read()
+                    public_key = load_public_key(public_pem)
+                    self.neighbour_public_keys[(address, port)] = public_key
+                    logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
+                    return public_key
+                else:
+                    logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
+                    return None
+        return None
 
     async def handle_client_connection(self, websocket, path):
         print("New client connected")
@@ -184,16 +318,15 @@ class Server:
         await asyncio.sleep(1)  # Wait to ensure servers are up
         for address, port in self.neighbour_addresses:
             try:
-                # Connect to the neighbor's server WebSocket port
-                neighbor_server_ws_port = port  # Ensure 'port' here refers to server_ws_port of the neighbor
-                uri = f"ws://{address}:{neighbor_server_ws_port}"
+                uri = f"ws://{address}:{port}"
                 websocket = await websockets.connect(uri)
                 self.servers[address] = websocket
-                self.websocket_to_server[websocket] = address  # Initially map websocket to address
-                logger.info(f"Connected to server at {address}:{neighbor_server_ws_port}")
+                self.websocket_to_server[websocket] = address
+                logger.info(f"Connected to server at {address}:{port}")
 
-                # Send 'server_hello'
-                server_hello_message = build_server_hello(self.address)
+                # Send 'server_hello' with signature and counter
+                self.counter += 1  # Increment server's own counter
+                server_hello_message = build_server_hello(self.address, self.private_key, self.counter)
                 server_hello_json = json.dumps(server_hello_message)
                 await websocket.send(server_hello_json)
                 log_message("Sent", server_hello_json)
@@ -302,65 +435,116 @@ class Server:
             print("Invalid message format from server")
             return
 
-        # Determine if 'type' is within 'data' or at the top level
-        if "data" in message_dict and "type" in message_dict["data"]:
-            # Extract 'type' from within 'data'
-            data = message_dict.get("data", {})
-            message_type = data.get("type")
+        # Check if the message is of type 'signed_data'
+        if message_dict.get("type") == MessageType.SIGNED_DATA.value:
+            # Extract the signed data
+            data_dict = message_dict.get("data", {})
+            data_type = data_dict.get("type")
+            counter = message_dict.get("counter")
+            signature_b64 = message_dict.get("signature")
+
+            # For 'server_hello' messages, verify the signature
+            if data_type == MessageType.SERVER_HELLO.value:
+                sender_address = data_dict.get("sender")
+                if not sender_address:
+                    print("Missing sender address in 'server_hello' message")
+                    return
+
+                # **Print the incoming 'server_hello' message**
+                print(f"Received 'server_hello' message from {sender_address}:")
+                print(json.dumps(message_dict, indent=2))
+
+                # Get the public key of the sender
+                public_key = self.get_neighbour_public_key(sender_address)
+                if not public_key:
+                    print(f"Unknown sender {sender_address}, cannot verify signature")
+                    return
+
+                # Get the last counter for this sender
+                last_counter = self.server_counters.get(sender_address, 0)
+
+                # Verify the signature
+                is_valid, error = verify_signed_message(message_dict, public_key, last_counter)
+                if not is_valid:
+                    print(f"Invalid signed 'server_hello' message from {sender_address}: {error}")
+                    return
+
+                # Update the counter
+                self.server_counters[sender_address] = counter
+
+                # Map the websocket to the sender_address
+                self.websocket_to_server[websocket] = sender_address
+                self.servers[sender_address] = websocket  # Update the servers dict
+                logger.info(f"Mapped websocket to server {sender_address}.")
+
+            else:
+                print(f"Received unexpected signed data type from server: {data_type}")
+
         else:
-            # Extract 'type' from the top level
+            # Non-signed messages
             message_type = message_dict.get("type")
 
-        if message_type == MessageType.CLIENT_UPDATE.value:
-            # Handle client_update
-            clients_b64 = message_dict.get('clients', [])
+            if message_type == MessageType.CLIENT_UPDATE.value:
+                # Handle 'client_update'
+                clients_b64 = message_dict.get('clients', [])
 
-            # Identify the server address from which this message was received
-            server_address = self.websocket_to_server.get(websocket)
+                # Identify the server address from which this message was received
+                server_address = self.websocket_to_server.get(websocket)
 
-            if not server_address:
-                logger.warning("Received client_update from an unknown server.")
-                return
+                if not server_address:
+                    logger.warning("Received 'client_update' from an unknown server.")
+                    return
 
-            for public_key_b64 in clients_b64:
-                public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
-                public_key = load_public_key(public_key_pem)
-                fingerprint = calculate_fingerprint(public_key)
-                self.client_public_keys[fingerprint] = public_key
-                
-                # Only update the fingerprint_to_server mapping if it doesn't exist
-                # or if the existing mapping is for the current server
-                if fingerprint not in self.fingerprint_to_server or self.fingerprint_to_server[fingerprint] == self.address:
+                for public_key_b64 in clients_b64:
+                    public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
+                    public_key = load_public_key(public_key_pem)
+                    fingerprint = calculate_fingerprint(public_key)
+                    self.client_public_keys[fingerprint] = public_key
+
+                    # Update the fingerprint-to-server mapping
                     self.fingerprint_to_server[fingerprint] = server_address
                     logger.info(f"Client {fingerprint} is associated with server {server_address}.")
 
-            logger.info(f"Updated client list from server {server_address}.")
+                logger.info(f"Updated client list from server {server_address}.")
 
-        elif message_type == MessageType.CLIENT_UPDATE_REQUEST.value:
-            # Handle client_update_request
-            logger.info("Received 'client_update_request' from server.")
-            await self.broadcast_client_update()
+            elif message_type == MessageType.CLIENT_UPDATE_REQUEST.value:
+                # Handle 'client_update_request'
+                logger.info("Received 'client_update_request' from server.")
+                await self.broadcast_client_update()
 
-        elif message_type == MessageType.SERVER_HELLO.value:
-            # Handle server_hello
-            sender_address = message_dict["data"].get("sender")
-            logger.info(f"Received 'server_hello' from {sender_address}")
+            elif message_type == MessageType.SERVER_HELLO.value:
+                # Handle unsigned 'server_hello' (for backward compatibility)
+                sender_address = message_dict.get("sender")
+                if not sender_address:
+                    print("Missing sender address in 'server_hello' message")
+                    return
 
-            # Map the websocket to the sender_address
-            self.websocket_to_server[websocket] = sender_address
-            self.servers[sender_address] = websocket  # Update the servers dict
-            logger.info(f"Mapped websocket to server {sender_address}.")
+                # Map the websocket to the sender_address
+                self.websocket_to_server[websocket] = sender_address
+                self.servers[sender_address] = websocket  # Update the servers dict
+                logger.info(f"Mapped websocket to server {sender_address}.")
 
-        elif message_type in [MessageType.CHAT.value, MessageType.PUBLIC_CHAT.value]:
-            # Handle chat messages
-            if message_type == MessageType.PUBLIC_CHAT.value:
-                # For public chat from other servers, only deliver to clients, don't forward
-                await self.deliver_message_to_clients(message_dict)
+            elif message_type in [MessageType.CHAT.value, MessageType.PUBLIC_CHAT.value]:
+                # Handle chat messages
+                if message_type == MessageType.PUBLIC_CHAT.value:
+                    # Deliver to clients
+                    await self.deliver_message_to_clients(message_dict)
+                else:
+                    await self.forward_message(message_dict)
+
             else:
-                await self.forward_message(message_dict)
+                print(f"Unknown message type from server: {message_type}")
 
-        else:
-            print(f"Unknown message type from server: {message_type}")
+    def get_neighbour_public_key(self, sender_address):
+        """
+        Retrieves the public key of a neighbour server based on the sender's address.
+        """
+        # The sender_address might be an IP or hostname; ensure it matches the stored addresses
+        for (address, port), public_key in self.neighbour_public_keys.items():
+            if sender_address == address or sender_address == f"{address}:{port}":
+                return public_key
+        return None
+
 
     async def forward_message(self, message_dict):
         data = message_dict.get('data', {})

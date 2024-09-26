@@ -1,3 +1,5 @@
+# client/client.py
+
 import asyncio
 import json
 import websockets
@@ -5,6 +7,7 @@ import threading
 import base64
 import os
 import aiohttp
+import time
 
 from flask import Flask, render_template, request, jsonify
 
@@ -23,6 +26,8 @@ LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true','1', '
 # Get client name from ENV
 CLIENT_NAME = os.environ.get('CLIENT_NAME', f"Client_{os.getpid()}")
 
+CONFIG_DIR = 'config'
+
 from common.crypto import (
     generate_rsa_key_pair,
     load_public_key,
@@ -31,6 +36,7 @@ from common.crypto import (
     decrypt_rsa_oaep,
     decrypt_aes_gcm,
     calculate_fingerprint,
+    load_private_key
 )
 from common.protocol import (
     build_hello_message,
@@ -96,6 +102,9 @@ class Client:
         self.name = CLIENT_NAME
         self.http_port = HTTP_PORT
         self.loop = asyncio.new_event_loop()
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        # Load or generate RSA key pair
+        self.load_or_generate_keys()
         asyncio.set_event_loop(self.loop)
 
     def start(self):
@@ -110,28 +119,47 @@ class Client:
         self.loop.run_forever()
 
     def load_or_generate_keys(self):
-        # Always generate new key pair
-        self.private_key, self.public_key = generate_rsa_key_pair()
-        # Save keys to files
-        private_pem = export_private_key(self.private_key)
-        with open('private_key.pem', 'wb') as f:
-            f.write(private_pem)
-        public_pem = export_public_key(self.public_key)
-        with open('public_key.pem', 'wb') as f:
-            f.write(public_pem)
+        private_key_path = os.path.join(CONFIG_DIR, 'private_key.pem')
+        public_key_path = os.path.join(CONFIG_DIR, 'public_key.pem')
+
+        if os.path.exists(private_key_path) and os.path.exists(public_key_path):
+            with open(private_key_path, 'rb') as f:
+                private_pem = f.read()
+            with open(public_key_path, 'rb') as f:
+                public_pem = f.read()
+            self.private_key = load_private_key(private_pem)
+            self.public_key = load_public_key(public_pem)
+            logger.info("Loaded existing key pair from config directory.")
+        else:
+            self.private_key, self.public_key = generate_rsa_key_pair()
+            private_pem = export_private_key(self.private_key)
+            with open(private_key_path, 'wb') as f:
+                f.write(private_pem)
+            public_pem = export_public_key(self.public_key)
+            with open(public_key_path, 'wb') as f:
+                f.write(public_pem)
+            logger.info("Generated new key pair and saved to config directory.")
+
 
     async def connect_to_server(self):
-        try:
-            self.websocket = await websockets.connect(CLIENT_WS_URI)
-            logger.info("Connected to server")
-
-            # Send 'hello' message
-            await self.send_hello()
-
-            # Start listening for messages
-            asyncio.ensure_future(self.receive_messages())
-        except Exception as e:
-            logger.error(f"Failed to connect to server: {e}")
+        max_retries = 10
+        retry_delay = 1  # Start with a 1-second delay
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.websocket = await websockets.connect(CLIENT_WS_URI)
+                logger.info("Connected to server")
+                # Send 'hello' message
+                await self.send_hello()
+                # Start listening for messages
+                asyncio.ensure_future(self.receive_messages())
+                break  # Exit the loop if connection is successful
+            except Exception as e:
+                logger.error(f"Attempt {attempt}: Failed to connect to server: {e}")
+                if attempt == max_retries:
+                    logger.error("Max retries reached. Exiting.")
+                    return
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
 
     async def send_hello(self):
         self.counter += 1  # Increment counter
@@ -155,6 +183,12 @@ class Client:
                 await self.handle_incoming_message(message_dict)
         except websockets.ConnectionClosed:
             logger.info("Connection to server closed")
+            # Try to reconnect
+            await self.connect_to_server()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            # Try to reconnect
+            await self.connect_to_server()
 
     async def handle_incoming_message(self, message_dict):
         # Extract message_type
