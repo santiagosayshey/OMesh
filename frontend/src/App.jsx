@@ -14,6 +14,7 @@ function OlafChatClient() {
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [publicHost, setPublicHost] = useState("");
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -29,6 +30,7 @@ function OlafChatClient() {
         setServerAddress(data.server_address);
         setServerPort(data.server_port);
         setHttpPort(data.http_port);
+        setPublicHost(data.public_host); // Added line
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
@@ -238,17 +240,64 @@ function OlafChatClient() {
       case "jpeg":
       case "png":
       case "gif":
+      case "bmp":
+      case "tiff":
+      case "svg":
       case "webp":
         return "🖼️"; // Image icon
+      case "mp3":
+      case "wav":
+      case "ogg":
+      case "flac":
+      case "aac":
+      case "m4a":
+        return "🎵"; // Audio file icon
+      case "mp4":
+      case "mov":
+      case "avi":
+      case "mkv":
+      case "webm":
+      case "wmv":
+        return "🎥"; // Video file icon
       case "pdf":
         return "📄"; // PDF icon
       case "zip":
       case "rar":
+      case "7z":
+      case "tar":
+      case "gz":
         return "🗜️"; // Archive icon
       case "txt":
+      case "rtf":
+      case "md":
+        return "📝"; // Text document icon
       case "doc":
       case "docx":
-        return "📝"; // Document icon
+      case "odt":
+        return "📄"; // Word document icon
+      case "xls":
+      case "xlsx":
+      case "ods":
+        return "📊"; // Spreadsheet icon
+      case "ppt":
+      case "pptx":
+      case "odp":
+        return "📈"; // Presentation icon
+      case "html":
+      case "css":
+      case "js":
+      case "jsx":
+      case "ts":
+      case "tsx":
+      case "json":
+      case "xml":
+      case "yml":
+      case "yaml":
+        return "🌐"; // Code file icon
+      case "exe":
+      case "msi":
+      case "apk":
+        return "💾"; // Executable file icon
       default:
         return "📁"; // Default file icon
     }
@@ -294,17 +343,17 @@ function OlafChatClient() {
             <strong>Fingerprint:</strong> {userFingerprint}
           </p>
           <p>
-            <strong>Connected to Server:</strong> {serverAddress}:{serverPort}
+            <strong>Connected to:</strong> {serverAddress}:{serverPort}
           </p>
           <p>
-            <strong>Personal File Server:</strong>{" "}
+            <strong>File Server:</strong>{" "}
             <a
               href={`http://${serverAddress}:${httpPort}/files`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 hover:underline"
             >
-              http://{serverAddress}:{httpPort}/files
+              http://{publicHost}:{httpPort}/files
             </a>
           </p>
         </div>

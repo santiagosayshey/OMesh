@@ -495,8 +495,11 @@ class Client:
             'fingerprint': fingerprint,
             'name': client_instance.name,
             'server_address': client_instance.server_address,
-            'server_port': client_instance.server_port
+            'server_port': client_instance.server_port,
+            'http_port': client_instance.http_port,
+            'public_host': PUBLIC_HOST
         })
+
 
     @app.route('/upload_file', methods=['POST'])
     def upload_file_route():
