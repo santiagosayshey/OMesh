@@ -8,6 +8,7 @@ import base64
 import os
 import aiohttp
 import time
+import signal
 
 from flask import Flask, render_template, request, jsonify
 
@@ -69,10 +70,21 @@ def log_message(direction, message):
             parsed_message = json.loads(message)
             # Remove or mask 'public_key' and 'signature' fields
             sanitized_message = sanitize_message(parsed_message)
-            formatted_json = json.dumps(sanitized_message, indent=2)
-            logger.info(f"{direction} message details:\n{formatted_json}")
+            message_type = ''
+            if 'type' in sanitized_message:
+                message_type = sanitized_message['type']
+            elif 'data' in sanitized_message and 'type' in sanitized_message['data']:
+                message_type = sanitized_message['data']['type']
+
+            if message_type in ['client_list', 'client_update']:
+                # For client_list or client_update, just log a simple message
+                logger.info(f"{direction} message of type '{message_type}' received.")
+            else:
+                formatted_json = json.dumps(sanitized_message, indent=2)
+                logger.info(f"{direction} message details:\n{formatted_json}")
         except json.JSONDecodeError:
             logger.info(f"{direction} message (not JSON):\n{message}")
+
 
 def sanitize_message(message):
     """
@@ -105,7 +117,22 @@ class Client:
         os.makedirs(CONFIG_DIR, exist_ok=True)
         # Load or generate RSA key pair
         self.load_or_generate_keys()
+        # Gracefully handle SIGKILL
+        self.shutdown_event = asyncio.Event()
+        signal.signal(signal.SIGTERM, self.handle_shutdown)
+        signal.signal(signal.SIGINT, self.handle_shutdown)
+        # Start
         asyncio.set_event_loop(self.loop)
+    
+    def handle_shutdown(self, signum, frame):
+        logger.info("Received shutdown signal")
+        asyncio.run_coroutine_threadsafe(self.close_connection(), self.loop)
+
+    async def close_connection(self):
+        if self.websocket:
+            await self.websocket.close()
+        self.shutdown_event.set()
+        self.loop.stop()
 
     def start(self):
         # Generate or load RSA key pair
