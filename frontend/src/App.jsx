@@ -494,7 +494,7 @@ function OlafChatClient() {
                   <div
                     className={`p-2 rounded-lg ${
                       isOwnMessage
-                        ? "bg-blue-600 text-white dark:bg-blue-500"
+                        ? "bg-green-600 text-white dark:bg-green-500"
                         : "bg-gray-300 text-gray-900 dark:bg-gray-700 dark:text-white"
                     }`}
                   >
@@ -502,7 +502,13 @@ function OlafChatClient() {
                       <strong className="mr-2 break-all">
                         {isOwnMessage ? "You" : message.sender}
                       </strong>
-                      <span className="text-xs text-gray-500 dark:text-gray-300">
+                      <span
+                        className={`text-sm ${
+                          isOwnMessage
+                            ? "text-white-500 dark:text-white-300"
+                            : "text-gray-500 dark:text-gray-300"
+                        }`}
+                      >
                         {formattedTime}
                       </span>
                     </div>
@@ -533,7 +539,13 @@ function OlafChatClient() {
                             </div>
                           )}
                           <div className="mt-2">
-                            <span className="text-gray-500 dark:text-gray-300 text-sm">
+                            <span
+                              className={`text-sm ${
+                                isOwnMessage
+                                  ? "text-white-500 dark:text-white-300"
+                                  : "text-gray-500 dark:text-gray-300"
+                              }`}
+                            >
                               View at:{" "}
                             </span>
                             <a
