@@ -1,12 +1,10 @@
-# server/server.py
-
 import asyncio
 import json
 import websockets
 from aiohttp import web
 import base64
 import os
-
+import ssl
 import logging
 
 # Configure logging
@@ -164,11 +162,11 @@ class Server:
 
         # Start WebSocket server for clients
         client_server = await websockets.serve(
-            self.handle_client_connection, self.address, self.client_ws_port, ping_interval=5
+            self.handle_client_connection, self.address, self.client_ws_port, ping_interval=5, ssl=None
         )
         # Start WebSocket server for other servers
         server_server = await websockets.serve(
-            self.handle_server_connection, self.address, self.server_ws_port
+            self.handle_server_connection, self.address, self.server_ws_port, ssl=None
         )
 
         # Start HTTP server for file transfers
@@ -192,44 +190,70 @@ class Server:
         await asyncio.Future()
 
     async def connect_to_neighbours(self):
+        logger.info("===== Starting connect_to_neighbours =====")
         await asyncio.sleep(1)  # Wait to ensure servers are up
         for address, port in self.neighbour_addresses:
             try:
-                uri = f"ws://{address}:{port}"
-                websocket = await websockets.connect(uri)
+                uri = f"wss://{address}:{port}"
+                logger.info(f"Attempting to connect to server at {address}:{port}")
+
+                # Create an SSL context that does NOT verify certificates
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False  # Disable hostname checking
+                ssl_context.verify_mode = ssl.CERT_NONE  # Disable certificate verification
+
+                # Connect to the neighbour server with the modified SSL context
+                websocket = await websockets.connect(uri, ssl=ssl_context)
                 self.servers[address] = websocket
                 self.websocket_to_server[websocket] = address
                 logger.info(f"Connected to server at {address}:{port}")
 
                 # Send 'server_hello' with signature and counter
                 self.counter += 1  # Increment server's own counter
-                server_hello_message = build_server_hello(self.address, self.private_key, self.counter)
+                server_uri = f"wss://{self.address}:{self.server_ws_port}"
+                server_hello_message = build_server_hello(server_uri, self.private_key, self.counter)
                 server_hello_json = json.dumps(server_hello_message)
+                logger.info(f"Sending 'server_hello' to server at {address}:{port}")
                 await websocket.send(server_hello_json)
+                logger.info(f"Sent 'server_hello' to server at {address}:{port}")
 
                 # Request client updates
                 client_update_request = build_client_update_request()
                 client_update_request_json = json.dumps(client_update_request)
+                logger.info(f"Requesting client updates from server at {address}:{port}")
                 await websocket.send(client_update_request_json)
+                logger.info(f"Requested client updates from server at {address}:{port}")
 
                 # Start listening to this server
+                logger.info(f"Starting to listen to server at {address}:{port}")
                 asyncio.ensure_future(self.listen_to_server(websocket))
             except Exception as e:
                 logger.error(f"Failed to connect to server at {address}:{port}: {e}")
+        logger.info("===== Finished connect_to_neighbours =====")
 
     def get_neighbour_public_key(self, sender_address):
         """
         Retrieves the public key of a neighbour server based on the sender's address.
         If not found in memory, attempts to load it from the 'neighbours' directory.
         """
+        # Strip 'wss://' prefix if present
+        if sender_address.startswith('wss://'):
+            sender_address = sender_address[6:]
+
+        # Remove port if present
+        if ':' in sender_address:
+            address_only = sender_address.split(':')[0]
+        else:
+            address_only = sender_address
+
         # Check if the public key is already loaded
         for (address, port), public_key in self.neighbour_public_keys.items():
-            if sender_address == address or sender_address == f"{address}:{port}":
+            if sender_address == address or address_only == address:
                 return public_key
 
         # Attempt to load the public key from the 'neighbours' directory
         for address, port in self.neighbour_addresses:
-            if sender_address == address or sender_address == f"{address}:{port}":
+            if sender_address == address or address_only == address:
                 key_filename = f'{address}_{port}_public_key.pem'
                 key_filepath = os.path.join(NEIGHBOURS_DIR, key_filename)
                 if os.path.exists(key_filepath):

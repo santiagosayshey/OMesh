@@ -1,0 +1,59 @@
+version: "3.8"
+services:
+  server:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server
+    ports:
+      - "8765:8765" # WebSocket port for clients
+      - "8766:8766" # WebSocket port for servers
+      - "8081:8081" # HTTP port for file transfers
+    volumes:
+      - clients:/app/server/clients
+      - files:/app/server/files
+      - config:/app/server/config
+      - neighbours:/app/server/neighbours
+    environment:
+      - SERVER_ADDRESS=0.0.0.0
+      - SERVER_PORT=8765
+      - SERVER_SERVER_PORT=8766
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=unknownweb.ddns.net:81
+      - LOG_MESSAGES=True
+      - PUBLIC_HOST=203.221.52.227
+    networks:
+      - olaf_network
+
+  client:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client
+    ports:
+      - "5001:5000"
+    volumes:
+      - config_client:/app/client/config
+      - chat_data_client:/app/client/chat_data
+    environment:
+      - SERVER_ADDRESS=server
+      - SERVER_PORT=8765
+      - LOG_MESSAGES=True
+      - CLIENT_NAME=Client1
+      - MESSAGE_EXPIRY_TIME=-1
+    networks:
+      - olaf_network
+    depends_on:
+      - server
+
+volumes:
+  clients:
+  files:
+  config:
+  neighbours:
+  config_client:
+  chat_data_client:
+
+networks:
+  olaf_network:
+    driver: bridge
