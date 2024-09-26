@@ -15,6 +15,7 @@ function OlafChatClient() {
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
+  const messagePaneRef = useRef(null);
 
   // Fetch user fingerprint, name, and server info on component mount
   useEffect(() => {
@@ -62,22 +63,20 @@ function OlafChatClient() {
         console.log("Received messages:", data);
         const newMessages = data.messages;
 
-        // Update the message list only with new messages
-        newMessages.forEach((message) => {
-          if (
-            !storedMessages.some(
-              (m) =>
-                m.sender === message.sender && m.message === message.message
-            )
-          ) {
-            setStoredMessages((prevMessages) => [...prevMessages, message]);
-          }
-        });
+        // Replace storedMessages with newMessages to prevent duplicates
+        setStoredMessages(newMessages);
       })
       .catch((error) => {
         console.error("Error refreshing messages:", error);
       });
   };
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagePaneRef.current) {
+      messagePaneRef.current.scrollTop = messagePaneRef.current.scrollHeight;
+    }
+  }, [storedMessages]);
 
   // Set up automatic refresh for messages every 10 seconds
   useEffect(() => {
@@ -250,6 +249,11 @@ function OlafChatClient() {
     };
   }, [isRecipientDropdownOpen]);
 
+  // Sort messages by timestamp
+  const sortedMessages = [...storedMessages].sort(
+    (a, b) => a.timestamp - b.timestamp
+  );
+
   return (
     <div className="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
       <div className="container mx-auto px-4 py-8 flex flex-col flex-grow">
@@ -272,47 +276,76 @@ function OlafChatClient() {
         </div>
 
         {/* Message pane */}
-        <div className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg">
-          {storedMessages.map((message, index) => {
+        <div
+          ref={messagePaneRef}
+          className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg"
+        >
+          {sortedMessages.map((message, index) => {
+            const isOwnMessage = message.sender === userFingerprint;
             const isFileMessage = message.message.startsWith("[File]");
             let messageContent = message.message;
             if (isFileMessage) {
               messageContent = message.message.replace("[File]", "").trim();
             }
 
+            // Format timestamp
+            const formattedTime = new Date(
+              message.timestamp * 1000
+            ).toLocaleString();
+
             return (
-              <div key={index} className="mb-2">
-                <strong>{message.sender}:</strong>{" "}
-                {isFileMessage ? (
-                  <div className="flex items-center mt-2">
-                    {["jpg", "jpeg", "png", "gif"].includes(
-                      messageContent.split(".").pop().toLowerCase()
-                    ) ? (
-                      <img
-                        src={messageContent}
-                        alt="Shared file"
-                        className="max-w-xs max-h-48 rounded-lg"
-                      />
+              <div
+                key={index}
+                className={`mb-4 flex ${
+                  isOwnMessage ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div
+                  className={`max-w-xs p-2 rounded-lg ${
+                    isOwnMessage ? "bg-blue-600" : "bg-gray-700"
+                  }`}
+                >
+                  <div className="flex items-center mb-1">
+                    <strong className="mr-2">
+                      {isOwnMessage ? "You" : message.sender}
+                    </strong>
+                    <span className="text-xs text-gray-300">
+                      {formattedTime}
+                    </span>
+                  </div>
+                  <div>
+                    {isFileMessage ? (
+                      <div className="flex items-center mt-2">
+                        {["jpg", "jpeg", "png", "gif"].includes(
+                          messageContent.split(".").pop().toLowerCase()
+                        ) ? (
+                          <img
+                            src={messageContent}
+                            alt="Shared file"
+                            className="max-w-full max-h-48 rounded-lg"
+                          />
+                        ) : (
+                          <>
+                            <span className="mr-2">
+                              {/* File icon */}
+                              {getFileTypeIcon(messageContent)}
+                            </span>
+                            <a
+                              href={messageContent}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-white underline"
+                            >
+                              {messageContent.split("/").pop()}
+                            </a>
+                          </>
+                        )}
+                      </div>
                     ) : (
-                      <>
-                        <span className="mr-2">
-                          {/* File icon */}
-                          {getFileTypeIcon(messageContent)}
-                        </span>
-                        <a
-                          href={messageContent}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 underline"
-                        >
-                          {messageContent.split("/").pop()}
-                        </a>
-                      </>
+                      <p className="break-words">{messageContent}</p>
                     )}
                   </div>
-                ) : (
-                  messageContent
-                )}
+                </div>
               </div>
             );
           })}

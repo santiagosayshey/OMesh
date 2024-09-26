@@ -55,6 +55,15 @@ CLIENT_WS_URI = f'ws://{SERVER_ADDRESS}:{SERVER_PORT}'
 PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'localhost')
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
 
+# Read MESSAGE_EXPIRY_TIME from environment variable
+MESSAGE_EXPIRY_TIME_ENV = os.environ.get('MESSAGE_EXPIRY_TIME', '-1')  # Default to -1 (infinite)
+try:
+    MESSAGE_EXPIRY_TIME = int(MESSAGE_EXPIRY_TIME_ENV)
+except ValueError:
+    # Handle invalid values
+    logger.error("Invalid MESSAGE_EXPIRY_TIME value. Defaulting to -1 (infinite).")
+    MESSAGE_EXPIRY_TIME = -1
+
 # Flask app
 app = Flask(__name__)
 
@@ -121,6 +130,22 @@ class Client:
         self.shutdown_event = asyncio.Event()
         signal.signal(signal.SIGTERM, self.handle_shutdown)
         signal.signal(signal.SIGINT, self.handle_shutdown)
+        # Message storage
+        self.message_lock = threading.Lock()
+        self.message_cleanup_interval = 60  # Check every 60 seconds
+        self.message_storage_file = os.path.join('chat_data', 'messages.json')
+        os.makedirs('chat_data', exist_ok=True)
+
+        # Only load messages if MESSAGE_EXPIRY_TIME is not zero
+        if MESSAGE_EXPIRY_TIME != 0:
+            self.load_messages()
+        else:
+            self.incoming_messages = []  # Initialize an empty list
+
+        # Start the message cleanup thread only if messages are stored
+        if MESSAGE_EXPIRY_TIME != 0:
+            threading.Thread(target=self.cleanup_old_messages, daemon=True).start()
+
         # Start
         asyncio.set_event_loop(self.loop)
     
@@ -170,7 +195,7 @@ class Client:
 
     async def connect_to_server(self):
         max_retries = 10
-        retry_delay = 5  # Start with a 1-second delay
+        retry_delay = 5  # Start with a 5-second delay
         for attempt in range(1, max_retries + 1):
             try:
                 self.websocket = await websockets.connect(CLIENT_WS_URI)
@@ -262,14 +287,18 @@ class Client:
             # Handle public chat message
             sender_fingerprint = data.get('sender')
             message_text = data.get('message')
-            self.incoming_messages.append({
+            timestamp = time.time()
+            message_entry = {
                 'sender': sender_fingerprint,
-                'message': message_text
-            })
-            log_message("Received", json.dumps({
-                'sender': sender_fingerprint,
-                'message': message_text
-            }))
+                'message': message_text,
+                'timestamp': timestamp
+            }
+            if MESSAGE_EXPIRY_TIME != 0:
+                self.incoming_messages.append(message_entry)
+                self.save_messages()
+            else:
+                self.incoming_messages.append(message_entry)
+            log_message("Received", json.dumps(message_entry))
         else:
             logger.warning(f"Unknown message type: {message_type}")
 
@@ -284,14 +313,18 @@ class Client:
             # Handle public chat message
             sender_fingerprint = data.get('sender')
             message_text = data.get('message')
-            self.incoming_messages.append({
+            timestamp = time.time()
+            message_entry = {
                 'sender': sender_fingerprint,
-                'message': message_text
-            })
-            log_message("Received", json.dumps({
-                'sender': sender_fingerprint,
-                'message': message_text
-            }))
+                'message': message_text,
+                'timestamp': timestamp
+            }
+            if MESSAGE_EXPIRY_TIME != 0:
+                self.incoming_messages.append(message_entry)
+                self.save_messages()
+            else:
+                self.incoming_messages.append(message_entry)
+            log_message("Received", json.dumps(message_entry))
         else:
             logger.warning(f"Unknown inner type in signed_data: {inner_type}")
 
@@ -325,19 +358,54 @@ class Client:
                 if my_fingerprint in participants:
                     sender_fingerprint = participants[0]
                     message_text = chat_data['message']
-                    self.incoming_messages.append({
+                    timestamp = time.time()
+                    message_entry = {
                         'sender': sender_fingerprint,
-                        'message': message_text
-                    })
-                    log_message("Received", json.dumps({
-                        'sender': sender_fingerprint,
-                        'message': message_text
-                    }))
+                        'message': message_text,
+                        'timestamp': timestamp
+                    }
+                    if MESSAGE_EXPIRY_TIME != 0:
+                        self.incoming_messages.append(message_entry)
+                        self.save_messages()
+                    else:
+                        self.incoming_messages.append(message_entry)
+                    log_message("Received", json.dumps(message_entry))
                     return
             except Exception as e:
                 logger.error(f"Failed to decrypt message with key {idx}: {e}")
 
         logger.warning("Message not intended for this client")
+
+    def load_messages(self):
+        try:
+            with open(self.message_storage_file, 'r') as f:
+                self.incoming_messages = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.incoming_messages = []
+
+    def save_messages(self):
+        with self.message_lock:
+            with open(self.message_storage_file, 'w') as f:
+                json.dump(self.incoming_messages, f)
+
+    def cleanup_old_messages(self):
+        while True:
+            time.sleep(self.message_cleanup_interval)
+            if MESSAGE_EXPIRY_TIME > 0:
+                current_time = time.time()
+                with self.message_lock:
+                    # Remove messages older than MESSAGE_EXPIRY_TIME
+                    self.incoming_messages = [
+                        msg for msg in self.incoming_messages
+                        if current_time - msg['timestamp'] <= MESSAGE_EXPIRY_TIME
+                    ]
+                    self.save_messages()
+            elif MESSAGE_EXPIRY_TIME == -1:
+                # Infinite time; do not delete messages
+                pass
+            else:
+                # MESSAGE_EXPIRY_TIME == 0; messages are not stored; no need to clean up
+                break  # Exit the cleanup thread
 
     def run_flask_app(self):
         # Suppress Flask's werkzeug logs by setting the logger level to ERROR
@@ -387,9 +455,24 @@ class Client:
 
     @app.route('/get_messages', methods=['GET'])
     def get_messages():
-        messages = client_instance.incoming_messages.copy()
-        client_instance.incoming_messages.clear()
-        return jsonify({'messages': messages})
+        if MESSAGE_EXPIRY_TIME == 0:
+            # Messages are not stored; return the current messages and clear them
+            messages = client_instance.incoming_messages.copy()
+            client_instance.incoming_messages.clear()
+            return jsonify({'messages': messages})
+        else:
+            current_time = time.time()
+            with client_instance.message_lock:
+                if MESSAGE_EXPIRY_TIME > 0:
+                    # Remove expired messages
+                    client_instance.incoming_messages = [
+                        msg for msg in client_instance.incoming_messages
+                        if current_time - msg['timestamp'] <= MESSAGE_EXPIRY_TIME
+                    ]
+                    client_instance.save_messages()
+
+                messages = client_instance.incoming_messages.copy()
+            return jsonify({'messages': messages})
 
     @app.route('/request_client_list', methods=['GET'])
     def request_client_list():
