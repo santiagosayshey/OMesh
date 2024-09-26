@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 function OlafChatClient() {
   const [userFingerprint, setUserFingerprint] = useState("");
   const [userName, setUserName] = useState("");
-  const [serverAddress, setServerAddress] = useState(""); // Added serverAddress
-  const [serverPort, setServerPort] = useState(""); // Added serverPort
+  const [serverAddress, setServerAddress] = useState("");
+  const [serverPort, setServerPort] = useState("");
   const [selectedRecipients, setSelectedRecipients] = useState(["global"]);
   const [clients, setClients] = useState([]);
   const [storedMessages, setStoredMessages] = useState([]);
@@ -23,8 +23,8 @@ function OlafChatClient() {
       .then((data) => {
         setUserFingerprint(data.fingerprint);
         setUserName(data.name);
-        setServerAddress(data.server_address); // Set serverAddress
-        setServerPort(data.server_port); // Set serverPort
+        setServerAddress(data.server_address);
+        setServerPort(data.server_port);
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
@@ -79,19 +79,25 @@ function OlafChatClient() {
       });
   };
 
-  // Set up automatic refresh every second
+  // Set up automatic refresh for messages every 10 seconds
   useEffect(() => {
     // Initial refresh
-    refreshClients();
+    refreshClients(); // Fetch clients on mount
     refreshMessages();
 
     const interval = setInterval(() => {
-      refreshClients();
       refreshMessages();
-    }, 1000);
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [clients, storedMessages]);
+  }, []);
+
+  // Fetch clients when recipient dropdown is opened
+  useEffect(() => {
+    if (isRecipientDropdownOpen) {
+      refreshClients();
+    }
+  }, [isRecipientDropdownOpen]);
 
   // Handle recipient change
   const handleRecipientChange = (event) => {
@@ -203,46 +209,6 @@ function OlafChatClient() {
     }
   };
 
-  // Function to send file message
-  const sendFileMessage = (fileUrl, messageText) => {
-    if (selectedRecipients.includes("global")) {
-      // Send public message
-      fetch("/send_public_message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `[File] ${messageText} ${fileUrl}` }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          console.log("Public file message sent response:", data);
-        })
-        .catch((error) => {
-          console.error("Error sending public file message:", error);
-        });
-    }
-
-    const privateRecipients = selectedRecipients.filter((r) => r !== "global");
-
-    if (privateRecipients.length > 0) {
-      // Send private message to selected recipients
-      fetch("/send_message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: `[File] ${messageText} ${fileUrl}`,
-          recipients: privateRecipients,
-        }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          console.log("Private file message sent response:", data);
-        })
-        .catch((error) => {
-          console.error("Error sending private file message:", error);
-        });
-    }
-  };
-
   // Function to get file type icon
   const getFileTypeIcon = (fileUrl) => {
     const extension = fileUrl.split(".").pop().toLowerCase();
@@ -330,7 +296,7 @@ function OlafChatClient() {
                     ) : (
                       <>
                         <span className="mr-2">
-                          {/* File icon can be added here */}
+                          {/* File icon */}
                           {getFileTypeIcon(messageContent)}
                         </span>
                         <a
