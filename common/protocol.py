@@ -34,7 +34,7 @@ def build_signed_message(data_dict, private_key, counter):
     - private_key: Sender's RSA private key.
     - counter: Monotonically increasing counter value.
     """
-    # Prepare the message payload
+    # Prepare the payload for signing
     payload = {
         "data": data_dict,
         "counter": counter
@@ -121,14 +121,14 @@ def build_hello_message(public_key, private_key, counter):
     """
     Constructs a signed 'hello' message according to the protocol.
     """
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode('utf-8')
+
     data_dict = {
         "type": "hello",
-        "public_key": base64.b64encode(
-            public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
-        ).decode('utf-8')
+        "public_key": public_pem
     }
     return build_signed_message(data_dict, private_key, counter)
 
@@ -139,16 +139,18 @@ def build_chat_message(destination_servers, recipients_public_keys, sender_priva
     iv = generate_iv()
     iv_b64 = base64.b64encode(iv).decode('utf-8')
 
-    # Prepare the chat data
+    # Prepare the chat data with wrapping 'chat' key
     sender_public_key = sender_private_key.public_key()
     sender_fingerprint = calculate_fingerprint(sender_public_key)
     participants = [sender_fingerprint] + [calculate_fingerprint(pk) for pk in recipients_public_keys]
-    
-    chat_data = {
-        "participants": participants,
-        "message": message_text
+
+    plaintext_chat_data = {
+        "chat": {
+            "participants": participants,
+            "message": message_text
+        }
     }
-    chat_json = json.dumps(chat_data)
+    chat_json = json.dumps(plaintext_chat_data)
 
     # Encrypt the chat data
     ciphertext, tag = encrypt_aes_gcm(chat_json.encode('utf-8'), aes_key, iv)
@@ -198,20 +200,19 @@ def build_client_list_request():
 def build_client_update(clients_public_keys):
     """
     Constructs a 'client_update' message.
-    - clients_public_keys: List of clients' public keys in PEM format.
+    - clients_public_keys: List of clients' public keys.
     """
-    clients_b64 = []
+    clients_pem = []
     for public_key in clients_public_keys:
         public_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-        public_key_b64 = base64.b64encode(public_pem).decode('utf-8')
-        clients_b64.append(public_key_b64)
+        ).decode('utf-8')  # Decode bytes to string
+        clients_pem.append(public_pem)
 
     message = {
         "type": MessageType.CLIENT_UPDATE.value,
-        "clients": clients_b64
+        "clients": clients_pem
     }
     return message
 
@@ -244,7 +245,6 @@ def build_server_hello(sender_address, private_key, counter):
         "sender": sender_address
     }
     return build_signed_message(data_dict, private_key, counter)
-
 
 # Function to validate the structure of a received message
 def validate_message_format(message_dict):

@@ -1,4 +1,3 @@
-
 # common/crypto.py
 
 from cryptography.hazmat.primitives import hashes, serialization
@@ -146,14 +145,14 @@ def decrypt_aes_gcm(cipher_bytes, key_bytes, iv_bytes, tag):
 def calculate_fingerprint(public_key):
     """
     Calculates the fingerprint of a public key.
-    Fingerprint = SHA-256(exported RSA public key in PEM format)
+    Fingerprint = Base64Encode(SHA-256(exported RSA public key in PEM format))
     """
     public_pem = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
-    fingerprint = hashlib.sha256(public_pem).hexdigest()
-    return fingerprint
+    fingerprint = hashlib.sha256(public_pem).digest()
+    return base64.b64encode(fingerprint).decode('utf-8')
 
 def export_public_key(public_key):
     """

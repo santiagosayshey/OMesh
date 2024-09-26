@@ -265,8 +265,8 @@ class Server:
                 # If we have received the 'hello' message, store the client's fingerprint
                 if fingerprint is None and message_dict.get('type') == MessageType.SIGNED_DATA.value:
                     if message_dict["data"].get("type") == 'hello':
-                        public_key_b64 = message_dict['data']['public_key']
-                        public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
+                        public_key_pem_str = message_dict['data']['public_key']
+                        public_key_pem = public_key_pem_str.encode('utf-8')
                         public_key = load_public_key(public_key_pem)
                         fingerprint = calculate_fingerprint(public_key)
                         self.clients[fingerprint] = websocket
@@ -360,6 +360,9 @@ class Server:
         ]
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
+        
+        # Log the message body
+        logger.info(f"Client update message body: {message_json}")
 
         for server_address, websocket in self.servers.items():
             try:
@@ -474,7 +477,7 @@ class Server:
 
             if message_type == MessageType.CLIENT_UPDATE.value:
                 # Handle 'client_update'
-                clients_b64 = message_dict.get('clients', [])
+                clients_pem = message_dict.get('clients', [])
 
                 # Identify the server address from which this message was received
                 server_address = self.websocket_to_server.get(websocket)
@@ -483,8 +486,8 @@ class Server:
                     logger.warning("Received 'client_update' from an unknown server.")
                     return
 
-                for public_key_b64 in clients_b64:
-                    public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
+                for public_key_pem_str in clients_pem:
+                    public_key_pem = public_key_pem_str.encode('utf-8')
                     public_key = load_public_key(public_key_pem)
                     fingerprint = calculate_fingerprint(public_key)
                     self.client_public_keys[fingerprint] = public_key
@@ -564,8 +567,8 @@ class Server:
                 servers_dict[server_address] = []
             public_key = self.client_public_keys.get(fingerprint)
             if public_key:
-                public_key_b64 = base64.b64encode(export_public_key(public_key)).decode('utf-8')
-                servers_dict[server_address].append(public_key_b64)
+                public_key_pem_str = export_public_key(public_key).decode('utf-8')
+                servers_dict[server_address].append(public_key_pem_str)
 
         # Convert the grouped dictionary to the required format
         servers = []
@@ -574,27 +577,6 @@ class Server:
                 "address": address,
                 "clients": clients
             })
-        # Include this server's own clients if not already included
-        own_clients_b64 = [
-            base64.b64encode(export_public_key(public_key)).decode('utf-8')
-            for fingerprint, public_key in self.client_public_keys.items()
-            if self.fingerprint_to_server.get(fingerprint) == self.address
-        ]
-
-        if own_clients_b64:
-            # Check if this server is already in the servers list
-            addresses = [server["address"] for server in servers]
-            if self.address not in addresses:
-                servers.append({
-                    "address": self.address,
-                    "clients": own_clients_b64
-                })
-            else:
-                # Append to existing server entry
-                for server in servers:
-                    if server["address"] == self.address:
-                        server["clients"].extend(own_clients_b64)
-                        break
 
         client_list_message = {
             "type": "client_list",

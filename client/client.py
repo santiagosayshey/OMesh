@@ -1,5 +1,3 @@
-# client/client.py
-
 import asyncio
 import json
 import websockets
@@ -266,9 +264,9 @@ class Client:
             servers = message_dict.get('servers', [])
             for server_entry in servers:
                 server_address = server_entry.get('address')
-                clients_b64 = server_entry.get('clients', [])
-                for public_key_b64 in clients_b64:
-                    public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
+                clients_pem = server_entry.get('clients', [])
+                for public_key_pem_str in clients_pem:
+                    public_key_pem = public_key_pem_str.encode('utf-8')
                     public_key = load_public_key(public_key_pem)
                     fingerprint = calculate_fingerprint(public_key)
                     self.known_clients[fingerprint] = public_key
@@ -277,9 +275,9 @@ class Client:
 
         elif message_type == 'client_update':
             # Update known clients and fingerprint_to_server mapping
-            clients_b64 = message_dict.get('clients', [])
-            for public_key_b64 in clients_b64:
-                public_key_pem = base64.b64decode(public_key_b64.encode('utf-8'))
+            clients_pem = message_dict.get('clients', [])
+            for public_key_pem_str in clients_pem:
+                public_key_pem = public_key_pem_str.encode('utf-8')
                 public_key = load_public_key(public_key_pem)
                 fingerprint = calculate_fingerprint(public_key)
                 self.known_clients[fingerprint] = public_key
@@ -359,11 +357,14 @@ class Client:
                 symm_key = decrypt_rsa_oaep(symm_key_encrypted, private_key)
                 plaintext_bytes = decrypt_aes_gcm(ciphertext, symm_key, iv, tag)
                 chat_data = json.loads(plaintext_bytes.decode('utf-8'))
+                
+                # Extract the 'chat' key as per the corrected structure
+                chat_content = chat_data.get('chat', {})
+                participants = chat_content.get('participants', [])
+                message_text = chat_content.get('message', '')
 
-                participants = chat_data.get('participants', [])
                 if my_fingerprint in participants:
                     sender_fingerprint = participants[0]
-                    message_text = chat_data['message']
                     timestamp = time.time()
                     message_entry = {
                         'sender': sender_fingerprint,
@@ -579,6 +580,7 @@ class Client:
 
         self.counter += 1
 
+        # Build the chat message using the corrected structure
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
@@ -599,7 +601,7 @@ class Client:
 
     async def request_client_list(self):
         message = {
-            "type": "client_list_request"
+            "type": "client_list_request",
         }
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
