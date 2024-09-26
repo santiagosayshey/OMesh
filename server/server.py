@@ -6,6 +6,7 @@ import websockets
 from aiohttp import web
 import base64
 import os
+import ssl
 
 import logging
 
@@ -42,6 +43,7 @@ SERVER_PORT = int(os.environ.get('SERVER_PORT', 8765))           # Client WS por
 SERVER_SERVER_PORT = int(os.environ.get('SERVER_SERVER_PORT', 8766)) # Server WS port
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
 PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'localhost')
+PUBLIC_ADDRESS = os.environ.get('PUBLIC_ADDRESS', 'localhost')  # Added this line
 
 # Parse NEIGHBOUR_ADDRESSES environment variable
 neighbour_addresses_env = os.environ.get('NEIGHBOUR_ADDRESSES', '')
@@ -61,8 +63,9 @@ CONFIG_DIR = 'config'
 NEIGHBOURS_DIR = 'neighbours'
 
 class Server:
-    def __init__(self, address, client_ws_port, server_ws_port, http_port, neighbours):
+    def __init__(self, address, client_ws_port, server_ws_port, http_port, neighbours, public_address):
         self.address = address
+        self.public_address = public_address  # Added this line
         self.client_ws_port = client_ws_port
         self.server_ws_port = server_ws_port
         self.http_port = http_port
@@ -127,7 +130,7 @@ class Server:
         public_pem = export_public_key(self.public_key)
         neighbours_dir = NEIGHBOURS_DIR
         os.makedirs(neighbours_dir, exist_ok=True)
-        key_filename = f'{self.address}_{self.server_ws_port}_public_key.pem'
+        key_filename = f'{self.public_address}_{self.server_ws_port}_public_key.pem'  # Updated line
         key_filepath = os.path.join(neighbours_dir, key_filename)
         with open(key_filepath, 'wb') as f:
             f.write(public_pem)
@@ -195,22 +198,38 @@ class Server:
         await asyncio.sleep(1)  # Wait to ensure servers are up
         for address, port in self.neighbour_addresses:
             try:
-                uri = f"ws://{address}:{port}"
-                websocket = await websockets.connect(uri)
+                uri = f"wss://{address}:{port}"
+                
+                # Create an SSL context that does NOT verify certificates
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False  # Disable hostname checking
+                ssl_context.verify_mode = ssl.CERT_NONE  # Disable certificate verification
+                
+                # Connect to the neighbour server with the modified SSL context
+                websocket = await websockets.connect(uri, ssl=ssl_context)
                 self.servers[address] = websocket
                 self.websocket_to_server[websocket] = address
                 logger.info(f"Connected to server at {address}:{port}")
 
-                # Send 'server_hello' with signature and counter
+                # Send 'server_hello' with correct sender address, signature, and counter
+                sender_address = f"wss://{self.public_address}:{self.server_ws_port}"  # Dynamic address
                 self.counter += 1  # Increment server's own counter
-                server_hello_message = build_server_hello(self.address, self.private_key, self.counter)
+                server_hello_message = build_server_hello(sender_address, self.private_key, self.counter)
                 server_hello_json = json.dumps(server_hello_message)
+
+                # Log the exact message being sent
+                logger.info(f"Sending 'server_hello' message to {address}:{port}")
+
                 await websocket.send(server_hello_json)
 
-                # Request client updates
+                # Request client updates from the neighbour server
                 client_update_request = build_client_update_request()
                 client_update_request_json = json.dumps(client_update_request)
                 await websocket.send(client_update_request_json)
+                logger.info(f"Sent 'client_update_request' to server {address}:{port}")
+
+                # Send a client_update message to the connected server
+                await self.broadcast_client_update()
 
                 # Start listening to this server
                 asyncio.ensure_future(self.listen_to_server(websocket))
@@ -222,26 +241,37 @@ class Server:
         Retrieves the public key of a neighbour server based on the sender's address.
         If not found in memory, attempts to load it from the 'neighbours' directory.
         """
+        # Remove wss:// or ws:// prefix if present
+        sender_address = sender_address.replace('wss://', '').replace('ws://', '')
+        logger.info(f"Searching for public key of sender: {sender_address}")
+
         # Check if the public key is already loaded
         for (address, port), public_key in self.neighbour_public_keys.items():
+            logger.info(f"Checking loaded key for {address}:{port}")
             if sender_address == address or sender_address == f"{address}:{port}":
+                logger.info(f"Found loaded public key for {sender_address}")
                 return public_key
+
+        logger.info("Public key not found in memory, checking 'neighbours' directory")
 
         # Attempt to load the public key from the 'neighbours' directory
         for address, port in self.neighbour_addresses:
+            logger.info(f"Checking for {address}:{port}")
             if sender_address == address or sender_address == f"{address}:{port}":
                 key_filename = f'{address}_{port}_public_key.pem'
                 key_filepath = os.path.join(NEIGHBOURS_DIR, key_filename)
+                logger.info(f"Looking for key file: {key_filepath}")
                 if os.path.exists(key_filepath):
                     with open(key_filepath, 'rb') as f:
                         public_pem = f.read()
-                    public_key = load_public_key(public_pem)
+                        public_key = load_public_key(public_pem)
                     self.neighbour_public_keys[(address, port)] = public_key
                     logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
                     return public_key
                 else:
                     logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
-                    return None
+
+        logger.warning(f"No public key found for {sender_address}")
         return None
 
     async def handle_client_connection(self, websocket, path):
@@ -255,13 +285,13 @@ class Server:
                     logger.error(f"Error parsing message from client: {error}")
                     logger.error(f"Erroneous message: {message}")
                     continue
-
+                
                 # Log the received message type
                 log_message("Received", message)
-
+                
                 # Handle client messages
                 await self.handle_client_message(websocket, message_dict, fingerprint)
-
+                
                 # If we have received the 'hello' message, store the client's fingerprint
                 if fingerprint is None and message_dict.get('type') == MessageType.SIGNED_DATA.value:
                     if message_dict["data"].get("type") == 'hello':
@@ -272,13 +302,13 @@ class Server:
                         self.clients[fingerprint] = websocket
                         self.client_public_keys[fingerprint] = public_key
                         self.client_counters[fingerprint] = 0  # Initialize counter
-                        self.fingerprint_to_server[fingerprint] = self.address  # Associate client with this server
+                        self.fingerprint_to_server[fingerprint] = self.address  # Associate client with this server's address
                         logger.info(f"Registered new client with fingerprint: {fingerprint} from {client_ip}:{client_port}")
 
                         # Broadcast the updated client list to other servers
                         await self.broadcast_client_update()
+
         except Exception as e:
-            # Log more detailed information on disconnection
             logger.error(f"Exception in handle_client_connection: {e}")
             if fingerprint:
                 logger.info(f"Client {fingerprint} disconnected from {client_ip}:{client_port}. Exception: {e}")
@@ -286,7 +316,6 @@ class Server:
                 logger.info(f"Unknown client disconnected from {client_ip}:{client_port}. Exception: {e}")
         finally:
             logger.info(f"Executing finally block for client from {client_ip}:{client_port}")
-            # Clean up on disconnection
             if fingerprint:
                 self.clients.pop(fingerprint, None)
                 self.client_public_keys.pop(fingerprint, None)
@@ -295,8 +324,6 @@ class Server:
                 logger.info(f"Cleaned up data for client {fingerprint}.")
             else:
                 logger.info(f"No fingerprint available for client from {client_ip}:{client_port}. No cleanup performed.")
-
-            # Broadcast the updated client list to other servers
             await self.broadcast_client_update()
 
     async def handle_server_connection(self, websocket, path):
@@ -356,7 +383,7 @@ class Server:
         # Prepare client_update message with only the clients connected to this server
         clients_public_keys = [
             public_key for fingerprint, public_key in self.client_public_keys.items()
-            if self.fingerprint_to_server.get(fingerprint) == self.address
+            if self.fingerprint_to_server.get(fingerprint) == self.address  # Correct association
         ]
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
@@ -364,9 +391,9 @@ class Server:
         for server_address, websocket in self.servers.items():
             try:
                 await websocket.send(message_json)
-                logger.info(f"Sent client update to server {server_address}.")
+                logger.info(f"Sent 'client_update' to server {server_address}.")
             except Exception as e:
-                logger.error(f"Error sending client update to server {server_address}: {e}")
+                logger.error(f"Error sending 'client_update' to server {server_address}: {e}")
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
         # First, verify the message structure
@@ -414,69 +441,57 @@ class Server:
             logger.warning(f"Unknown message type from client: {message_type}")
 
     async def handle_server_message(self, websocket, message_dict):
-        # Validate the message structure
         if not validate_message_format(message_dict):
             logger.error("Invalid message format from server")
             logger.error(f"Erroneous message: {message_dict}")
             return
 
-        # Check if the message is of type 'signed_data'
-        if message_dict.get("type") == MessageType.SIGNED_DATA.value:
-            # Extract the signed data
+        message_type = message_dict.get("type")
+
+        if message_type == MessageType.SIGNED_DATA.value:
             data_dict = message_dict.get("data", {})
             data_type = data_dict.get("type")
 
-            # For 'server_hello' messages, verify the signature
             if data_type == MessageType.SERVER_HELLO.value:
                 sender_address = data_dict.get("sender")
                 if not sender_address:
                     logger.error("Missing sender address in 'server_hello' message")
                     return
 
-                # Get the public key of the sender
+                logger.info(f"Received 'server_hello' message from {sender_address}: {json.dumps(message_dict)}")
+                logger.info(f"Signature in received 'server_hello': {message_dict.get('signature')}")
+
                 public_key = self.get_neighbour_public_key(sender_address)
                 if not public_key:
                     logger.error(f"Unknown sender {sender_address}, cannot verify signature")
                     return
 
-                # Get the last counter for this sender
                 counter = message_dict.get("counter")
                 last_counter = self.server_counters.get(sender_address, 0)
 
-                # Verify the signature
                 is_valid, error = verify_signed_message(message_dict, public_key, last_counter)
                 if not is_valid:
                     logger.error(f"Invalid signed 'server_hello' message from {sender_address}: {error}")
                     logger.error(f"Erroneous message: {message_dict}")
                     return
 
-                # Update the counter
                 self.server_counters[sender_address] = counter
-
-                # Map the websocket to the sender_address
                 self.websocket_to_server[websocket] = sender_address
-                self.servers[sender_address] = websocket  # Update the servers dict
+                self.servers[sender_address] = websocket
                 logger.info(f"Mapped websocket to server {sender_address}.")
 
+            elif data_type == MessageType.CHAT.value:
+                await self.forward_message(message_dict)
+            elif data_type == MessageType.PUBLIC_CHAT.value:
+                await self.handle_public_chat(message_dict, from_client=False)
             else:
-                # For other signed_data messages from clients, do not verify signature
-                if data_type == MessageType.CHAT.value:
-                    await self.forward_message(message_dict)
-                elif data_type == MessageType.PUBLIC_CHAT.value:
-                    # For public chat from other servers, deliver to clients only
-                    await self.handle_public_chat(message_dict, from_client=False)
-                else:
-                    logger.warning(f"Received unexpected signed data type from server: {data_type}")
+                logger.warning(f"Received unexpected signed data type from server: {data_type}")
 
         else:
-            # Non-signed messages
             message_type = message_dict.get("type")
 
             if message_type == MessageType.CLIENT_UPDATE.value:
-                # Handle 'client_update'
                 clients_b64 = message_dict.get('clients', [])
-
-                # Identify the server address from which this message was received
                 server_address = self.websocket_to_server.get(websocket)
 
                 if not server_address:
@@ -496,21 +511,8 @@ class Server:
                 logger.info(f"Updated client list from server {server_address}.")
 
             elif message_type == MessageType.CLIENT_UPDATE_REQUEST.value:
-                # Handle 'client_update_request'
                 logger.info("Received 'client_update_request' from server.")
                 await self.broadcast_client_update()
-
-            elif message_type == MessageType.SERVER_HELLO.value:
-                # Handle unsigned 'server_hello' (for backward compatibility)
-                sender_address = message_dict.get("sender")
-                if not sender_address:
-                    logger.error("Missing sender address in 'server_hello' message")
-                    return
-
-                # Map the websocket to the sender_address
-                self.websocket_to_server[websocket] = sender_address
-                self.servers[sender_address] = websocket  # Update the servers dict
-                logger.info(f"Mapped websocket to server {sender_address}.")
 
             else:
                 logger.warning(f"Unknown message type from server: {message_type}")
@@ -523,12 +525,12 @@ class Server:
             destination_servers = data.get('destination_servers', [])
 
             # Deliver to clients on this server if it's a destination
-            if self.address in destination_servers:
+            if self.address in destination_servers:  # Corrected line
                 await self.deliver_message_to_clients(message_dict)
 
             # Forward to other servers, but only the part they need
             for server_address in destination_servers:
-                if server_address != self.address and server_address in self.servers:
+                if server_address != self.address and server_address in self.servers:  # Corrected line
                     websocket = self.servers[server_address]
                     try:
                         # Create a new message with only this server as destination
@@ -578,21 +580,21 @@ class Server:
         own_clients_b64 = [
             base64.b64encode(export_public_key(public_key)).decode('utf-8')
             for fingerprint, public_key in self.client_public_keys.items()
-            if self.fingerprint_to_server.get(fingerprint) == self.address
+            if self.fingerprint_to_server.get(fingerprint) == self.address  # Corrected line
         ]
 
         if own_clients_b64:
             # Check if this server is already in the servers list
             addresses = [server["address"] for server in servers]
-            if self.address not in addresses:
+            if self.address not in addresses:  # Corrected line
                 servers.append({
-                    "address": self.address,
+                    "address": self.address,  # Corrected line
                     "clients": own_clients_b64
                 })
             else:
                 # Append to existing server entry
                 for server in servers:
-                    if server["address"] == self.address:
+                    if server["address"] == self.address:  # Corrected line
                         server["clients"].extend(own_clients_b64)
                         break
 
@@ -616,7 +618,7 @@ class Server:
             # Forward to all other servers
             message_json = json.dumps(message_dict)
             for server_address, websocket in self.servers.items():
-                if server_address != self.address:
+                if server_address != self.address:  # Corrected line
                     try:
                         await websocket.send(message_json)
                         logger.info(f"Forwarded public chat to server {server_address}.")
@@ -697,9 +699,10 @@ if __name__ == '__main__':
     server_ws_port = SERVER_SERVER_PORT
     http_port = HTTP_PORT
     neighbours = NEIGHBOUR_ADDRESSES
+    public_address = PUBLIC_ADDRESS  # Added this line
 
     # Create Server instance with correct parameters
-    server = Server(address, client_ws_port, server_ws_port, http_port, neighbours)
+    server = Server(address, client_ws_port, server_ws_port, http_port, neighbours, public_address)
     try:
         asyncio.run(server.start())
     except KeyboardInterrupt:

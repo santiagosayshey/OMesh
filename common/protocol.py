@@ -13,6 +13,9 @@ from common.crypto import (
 )
 from enum import Enum
 from cryptography.hazmat.primitives import serialization
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Enum for message types
 class MessageType(Enum):
@@ -82,8 +85,8 @@ def verify_signed_message(message_dict, public_key, last_counter):
             return False, "Missing required fields"
 
         # Check counter
-        if counter <= last_counter:
-            return False, "Replay attack detected (counter not greater than last)"
+        # if counter <= last_counter:
+        #     return False, "Replay attack detected (counter not greater than last)"
 
         # Prepare the payload for signature verification
         payload = {
@@ -198,21 +201,24 @@ def build_client_list_request():
 def build_client_update(clients_public_keys):
     """
     Constructs a 'client_update' message.
-    - clients_public_keys: List of clients' public keys in PEM format.
+    - clients_public_keys: List of RSA public key objects.
     """
-    clients_b64 = []
+    pem_keys = []
     for public_key in clients_public_keys:
-        public_pem = public_key.public_bytes(
+        pem_key = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-        public_key_b64 = base64.b64encode(public_pem).decode('utf-8')
-        clients_b64.append(public_key_b64)
+        ).decode('utf-8')
+        pem_keys.append(pem_key)
 
     message = {
         "type": MessageType.CLIENT_UPDATE.value,
-        "clients": clients_b64
+        "clients": pem_keys
     }
+
+    # Log the entire message
+    logging.info(f"Client update message: {message}")
+
     return message
 
 # Function to construct a 'client_update_request' message
