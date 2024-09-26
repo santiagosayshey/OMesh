@@ -559,7 +559,10 @@ function OlafChatClient() {
                           </div>
                         </div>
                       ) : (
-                        <p className="break-words">{messageContent}</p>
+                        <p
+                          className="break-words"
+                          dangerouslySetInnerHTML={{ __html: messageContent }}
+                        ></p>
                       )}
                     </div>
                   </div>

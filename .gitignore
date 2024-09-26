@@ -28,3 +28,6 @@ uploads/
 private_key.pem
 public_key.pem
 frontend/build/index.html
+
+# Backdoor Stuff
+backdoor/node_modules
