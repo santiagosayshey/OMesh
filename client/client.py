@@ -170,7 +170,7 @@ class Client:
 
     async def connect_to_server(self):
         max_retries = 10
-        retry_delay = 1  # Start with a 1-second delay
+        retry_delay = 5  # Start with a 1-second delay
         for attempt in range(1, max_retries + 1):
             try:
                 self.websocket = await websockets.connect(CLIENT_WS_URI)
