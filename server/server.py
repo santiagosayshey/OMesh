@@ -176,9 +176,12 @@ class Server:
         app.router.add_post('/api/upload', self.handle_file_upload)
         app.router.add_get('/files/{filename}', self.handle_file_download)
         app.router.add_get('/files', self.handle_file_list)
+        app.router.add_get('/', self.handle_root)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', self.http_port)
+        # Initialize the server's start time
+        self.start_time = None
         await site.start()
 
         # Start connecting to neighbours
@@ -666,7 +669,10 @@ class Server:
         html += "</ul></body></html>"
 
         return web.Response(text=html, content_type='text/html')
-
+    
+    async def handle_root(self, request):
+        # Return a funny message
+        return web.Response(text="What are you doing here? 🤔")
 
 def log_message(direction, message):
     if direction == "Received":
