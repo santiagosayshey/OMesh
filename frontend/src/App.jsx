@@ -7,13 +7,13 @@ function OlafChatClient() {
   const [userName, setUserName] = useState("");
   const [serverAddress, setServerAddress] = useState("");
   const [serverPort, setServerPort] = useState("");
+  const [httpPort, setHttpPort] = useState("");
   const [selectedRecipients, setSelectedRecipients] = useState(["global"]);
   const [clients, setClients] = useState([]);
   const [storedMessages, setStoredMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -28,6 +28,7 @@ function OlafChatClient() {
         setUserName(data.name);
         setServerAddress(data.server_address);
         setServerPort(data.server_port);
+        setHttpPort(data.http_port);
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
@@ -237,6 +238,7 @@ function OlafChatClient() {
       case "jpeg":
       case "png":
       case "gif":
+      case "webp":
         return "🖼️"; // Image icon
       case "pdf":
         return "📄"; // PDF icon
@@ -278,7 +280,7 @@ function OlafChatClient() {
   return (
     <div className="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
       <div className="container mx-auto px-4 py-8 flex flex-col flex-grow">
-        {/* Header section without the description */}
+        {/* Header section */}
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold">OMesh</h1>
         </div>
@@ -293,6 +295,17 @@ function OlafChatClient() {
           </p>
           <p>
             <strong>Connected to Server:</strong> {serverAddress}:{serverPort}
+          </p>
+          <p>
+            <strong>Personal File Server:</strong>{" "}
+            <a
+              href={`http://${serverAddress}:${httpPort}/files`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              http://{serverAddress}:{httpPort}/files
+            </a>
           </p>
         </div>
 
@@ -341,8 +354,8 @@ function OlafChatClient() {
                   </div>
                   <div>
                     {isFileMessage ? (
-                      <div className="flex items-center mt-2">
-                        {["jpg", "jpeg", "png", "gif"].includes(
+                      <div className="mt-2">
+                        {["jpg", "jpeg", "png", "gif", "webp"].includes(
                           messageContent.split(".").pop().toLowerCase()
                         ) ? (
                           <img
@@ -351,9 +364,8 @@ function OlafChatClient() {
                             className="max-w-full max-h-48 rounded-lg"
                           />
                         ) : (
-                          <>
+                          <div className="flex items-center">
                             <span className="mr-2">
-                              {/* File icon */}
                               {getFileTypeIcon(messageContent)}
                             </span>
                             <a
@@ -364,8 +376,21 @@ function OlafChatClient() {
                             >
                               {messageContent.split("/").pop()}
                             </a>
-                          </>
+                          </div>
                         )}
+                        <div className="mt-2">
+                          <span className="text-gray-300 text-sm">
+                            View at:{" "}
+                          </span>
+                          <a
+                            href={messageContent}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white underline break-all"
+                          >
+                            {messageContent}
+                          </a>
+                        </div>
                       </div>
                     ) : (
                       <p className="break-words">{messageContent}</p>
