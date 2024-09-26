@@ -103,12 +103,25 @@ function OlafChatClient() {
   // Handle recipient change
   const handleRecipientChange = (event) => {
     const value = event.target.value;
-    if (event.target.checked) {
-      // Add recipient
-      setSelectedRecipients((prev) => [...prev, value]);
+    if (value === "global") {
+      if (event.target.checked) {
+        // 'global' is selected, unselect all other recipients
+        setSelectedRecipients(["global"]);
+      } else {
+        // 'global' is unselected
+        setSelectedRecipients([]);
+      }
     } else {
-      // Remove recipient
-      setSelectedRecipients((prev) => prev.filter((item) => item !== value));
+      if (event.target.checked) {
+        // Add recipient, ensure 'global' is not selected
+        setSelectedRecipients((prev) => {
+          const newRecipients = prev.filter((item) => item !== "global");
+          return [...newRecipients, value];
+        });
+      } else {
+        // Remove recipient
+        setSelectedRecipients((prev) => prev.filter((item) => item !== value));
+      }
     }
   };
 
@@ -285,9 +298,14 @@ function OlafChatClient() {
 
         {/* Message pane */}
         <div
-          ref={messagePaneRef}
           className="flex-grow overflow-y-auto bg-gray-800 p-4 rounded-lg"
+          ref={messagePaneRef}
         >
+          {/* Display selected recipients */}
+          <div className="mb-4">
+            <strong>Chatting with:</strong> {selectedRecipients.join(", ")}
+          </div>
+
           {sortedMessages.map((message, index) => {
             const isOwnMessage = message.sender === userFingerprint;
             const isFileMessage = message.message.startsWith("[File]");
@@ -309,12 +327,12 @@ function OlafChatClient() {
                 }`}
               >
                 <div
-                  className={`max-w-xs p-2 rounded-lg ${
+                  className={`p-2 rounded-lg ${
                     isOwnMessage ? "bg-blue-600" : "bg-gray-700"
                   }`}
                 >
                   <div className="flex items-center mb-1">
-                    <strong className="mr-2">
+                    <strong className="mr-2 break-all">
                       {isOwnMessage ? "You" : message.sender}
                     </strong>
                     <span className="text-xs text-gray-300">
@@ -434,7 +452,10 @@ function OlafChatClient() {
                   )}
                 </button>
                 {isRecipientDropdownOpen && (
-                  <div className="absolute z-10 bg-gray-800 text-white mb-2 rounded shadow-lg left-0 bottom-full">
+                  <div
+                    className="absolute z-10 bg-blue-700 text-white mb-2 rounded shadow-lg left-0 bottom-full min-w-max"
+                    style={{ whiteSpace: "nowrap" }}
+                  >
                     <div className="p-2 max-h-60 overflow-y-auto">
                       <label className="flex items-center mb-1">
                         <input
@@ -444,7 +465,9 @@ function OlafChatClient() {
                           onChange={handleRecipientChange}
                           className="form-checkbox h-4 w-4 text-indigo-600"
                         />
-                        <span className="ml-2">Global Chat</span>
+                        <span className="ml-2 whitespace-nowrap">
+                          Global Chat
+                        </span>
                       </label>
                       {clients
                         .filter(
@@ -462,7 +485,9 @@ function OlafChatClient() {
                               onChange={handleRecipientChange}
                               className="form-checkbox h-4 w-4 text-indigo-600"
                             />
-                            <span className="ml-2">{fingerprint}</span>
+                            <span className="ml-2 whitespace-nowrap">
+                              {fingerprint}
+                            </span>
                           </label>
                         ))}
                     </div>
