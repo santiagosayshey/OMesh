@@ -109,11 +109,13 @@ services:
       - "5001:5000"
     volumes:
       - config_client1:/app/client/config
+      - chat_data_client1:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client1
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -128,11 +130,13 @@ services:
       - "5002:5000"
     volumes:
       - config_client2:/app/client/config
+      - chat_data_client2:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client2
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -147,11 +151,13 @@ services:
       - "5003:5000"
     volumes:
       - config_client3:/app/client/config
+      - chat_data_client3:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client3
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -166,11 +172,13 @@ services:
       - "5004:5000"
     volumes:
       - config_client4:/app/client/config
+      - chat_data_client4:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server2
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client4
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -185,11 +193,13 @@ services:
       - "5005:5000"
     volumes:
       - config_client5:/app/client/config
+      - chat_data_client5:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client5
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -204,11 +214,13 @@ services:
       - "5006:5000"
     volumes:
       - config_client6:/app/client/config
+      - chat_data_client6:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client6
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -223,11 +235,13 @@ services:
       - "5007:5000"
     volumes:
       - config_client7:/app/client/config
+      - chat_data_client7:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client7
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -242,11 +256,13 @@ services:
       - "5008:5000"
     volumes:
       - config_client8:/app/client/config
+      - chat_data_client8:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server4
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client8
+      - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
     depends_on:
@@ -277,6 +293,14 @@ volumes:
   config_client6:
   config_client7:
   config_client8:
+  chat_data_client1:
+  chat_data_client2:
+  chat_data_client3:
+  chat_data_client4:
+  chat_data_client5:
+  chat_data_client6:
+  chat_data_client7:
+  chat_data_client8:
 
 networks:
   olaf_network:
