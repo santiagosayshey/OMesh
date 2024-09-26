@@ -175,6 +175,7 @@ class Server:
         app = web.Application()
         app.router.add_post('/api/upload', self.handle_file_upload)
         app.router.add_get('/files/{filename}', self.handle_file_download)
+        app.router.add_get('/files', self.handle_file_list)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', self.http_port)
@@ -652,6 +653,20 @@ class Server:
         if not os.path.exists(filepath):
             return web.HTTPNotFound()
         return web.FileResponse(filepath)
+    
+    async def handle_file_list(self, request):
+        files = os.listdir(FILES_DIR)
+        files.sort()  # Optionally sort the file list
+
+        # Build an HTML response
+        html = "<html><body><h1>Uploaded Files</h1><ul>"
+        for filename in files:
+            file_url = f"/files/{filename}"
+            html += f'<li><a href="{file_url}">{filename}</a></li>'
+        html += "</ul></body></html>"
+
+        return web.Response(text=html, content_type='text/html')
+
 
 def log_message(direction, message):
     if direction == "Received":
