@@ -14,7 +14,7 @@ function OlafChatClient() {
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
   const [publicHost, setPublicHost] = useState("");
-  const [isDarkMode, setIsDarkMode] = useState(false); // Added for dark mode
+  const [isDarkMode, setIsDarkMode] = useState(true); // Added for dark mode
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
