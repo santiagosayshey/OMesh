@@ -648,6 +648,19 @@ class Client:
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
 
+        # Log the sent private message
+        message_entry = {
+            'sender': my_fingerprint,
+            'message': message_text,
+            'timestamp': time.time()
+        }
+        if MESSAGE_EXPIRY_TIME != 0:
+            self.incoming_messages.append(message_entry)
+            self.save_messages()
+        else:
+            self.incoming_messages.append(message_entry)
+
+
 
     async def send_public_chat(self, message_text):
         self.counter += 1  # Increment counter
