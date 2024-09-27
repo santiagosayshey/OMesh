@@ -1,45 +1,56 @@
+Certainly! I'll tidy up the document and make it more presentable. Here's the improved version:
+
+````markdown
 # Backdoor 3: Client Spoof
 
 ## Description
 
-This backdoor allows any malicious client to impersonate any other client known to the neighborhood. It enables them to send messages as the client, without alerting them of this happening.
+This backdoor allows any malicious client to impersonate any other client known to the neighborhood. It enables them to send messages as another client, without alerting the impersonated client of this activity.
+
+---
 
 ## Technical Details
 
-When a client receives a private message, it attempts to decrypt and store it to be sent to the frontend. The backdoor expands on this functionality by explicitly checking for a JSON data structure within the message. If one is found and includes type: 'banana_phone', then we attempt to parse the rest of the message:
+When a client receives a private message, it attempts to decrypt and store it to be sent to the frontend. The backdoor expands on this functionality by checking for a JSON data structure within the message. If one is found and includes `type: 'banana_phone'`, it parses the rest of the message:
 
 ```json
 {
     "type": "banana_phone",
-    "to": [<list: string: fingerprint>],
-    "message": <string: real message>
+    "to": [list: string: fingerprint],
+    "message": string: real message
 }
 ```
+````
 
-- `to` contains a list of fingerprints that the 'real' message should be sent to.
-- `message` contains the real message to be sent
-- The original recipient will become the new sender
+- `to`: Contains a list of fingerprints that the 'real' message should be sent to.
+- `message`: Contains the real message to be sent.
+- The original recipient becomes the new sender.
 
 The function then calls the existing `send_private_chat` message with these new details, as if it came from the client.
 
-Importantly, the recipient never logs or saves the sent message, and explicitly changes the original received message to be some other random, innocuous message that doesn't alert suspicion.
+Crucially, the recipient never logs or saves the sent message, and explicitly changes the original received message to a random, innocuous message to avoid suspicion.
+
+---
 
 ## Objectives
 
 This backdoor violates several key security principles:
 
-1. Authentication: It allows impersonation of other clients.
-2. Integrity: It modifies the content of messages without authorization.
-3. Non-repudiation: It makes it impossible to prove who really sent a message.
-4. Confidentiality: It allows unauthorized access to private communications.
+1. Authentication: Allows impersonation of other clients.
+2. Integrity: Modifies message content without authorization.
+3. Non-repudiation: Makes it impossible to prove who really sent a message.
+4. Confidentiality: Allows unauthorized access to private communications.
+
+---
 
 ## Exploitation Method (Proof of Concept)
 
 1. Attacker identifies the fingerprint of the client they want to impersonate (Client 3) and the intended recipient (Client 4).
 
-![Image 3.1](appendix/Image%203.1.png?width=300)
-
-<p align="center"><em>Figure 3.1: Attacker selects client 3 to send to, noting down the fingerprint of client 4</em></p>
+<figure align="center">
+  <img src="appendix/Image%203.1.png" alt="Attacker selecting client to impersonate" width="300">
+  <figcaption><em>Figure 3.1: Attacker selects client 3 to send to, noting down the fingerprint of client 4</em></figcaption>
+</figure>
 
 2. Attacker crafts a message to Client 3 with the following structure:
    ```json
@@ -52,16 +63,20 @@ This backdoor violates several key security principles:
 3. Attacker sends this message to Client 3 using the normal private chat protocol.
 4. Client 3's system processes this message, replacing the content with a random innocuous message in its own logs.
 
-![Image 3.2](appendix/Image%203.2.png?width=300)
+<figure align="center">
+  <img src="appendix/Image%203.2.png" alt="Victim's client interface showing a harmless message" width="600">
+  <figcaption><em>Figure 3.2: The victim's client interface showing a randomly selected harmless message, masking the attacker's covert message manipulation</em></figcaption>
+</figure>
 
-<p align="center"><em>Figure 3.2: The attacker's message appears as innocuous message on the victim client's frontend as to not alert suspicion</em></p>
+5. Client 3's system then sends the "real" message to Client 4, appearing to come from Client 3.
+6. Client 4 receives a message that appears to be from Client 3, but was actually initiated by the attacker (Client 1).
 
-5. Client 3's system then sends the "real" message to Client B, appearing to come from Client A.
-6. Client B receives a message that appears to be from Client A, but was actually initiated by the attacker.
+<figure align="center">
+  <img src="appendix/Image%203.3.png" alt="Real message sent to client 4" width="300">
+  <figcaption><em>Figure 3.3: The real message is sent to client 4, appearing to be sent by client 3</em></figcaption>
+</figure>
 
-![Image 3.3](appendix/Image%203.3.png?width=300)
-
-<p align="center"><em>Figure 3.3: The real message appears is sent to client 4, appearing to be sent by client 3</em></p>
+---
 
 ## Detection Challenges
 
@@ -70,6 +85,8 @@ This backdoor violates several key security principles:
 - The use of a special message type ('banana_phone') is not immediately suspicious and could be mistaken for a feature or Easter egg.
 - The original message is replaced with random innocuous content, leaving no trace of the malicious activity in the sender's logs.
 - The backdoor leverages existing message sending functions, making its activities appear as normal traffic.
+
+---
 
 ## Code Snippet
 
@@ -120,3 +137,5 @@ async def decrypt_and_store_message(self, data):
 
     # ... (handle case where message is not intended for this client)
 ```
+
+This version maintains the content while improving readability and presentation. The images are now consistently formatted using the `<figure>` element, and the overall structure is more coherent.
