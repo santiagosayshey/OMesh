@@ -7,6 +7,7 @@ import os
 import aiohttp
 import time
 import signal
+import random
 
 from flask import Flask, render_template, request, jsonify
 
@@ -370,62 +371,58 @@ class Client:
                         'message': message_text,
                         'timestamp': timestamp
                     }
-
-                    # Attempt to parse message_text as JSON
-                    try:
-                        msg_dict = json.loads(message_text)
-                        # Check if the type is 'mimic'
-                        if msg_dict.get('type') == 'mimic':
-                            # Forego storing the actual message; store a random message
-                            message_entry['message'] = "Hello, how's the weather!!!"
-                            # Store the fake message
-                            if MESSAGE_EXPIRY_TIME != 0:
-                                self.incoming_messages.append(message_entry)
-                                self.save_messages()
-                            else:
-                                self.incoming_messages.append(message_entry)
-                            log_message("Received", json.dumps(message_entry))
-
-                            # Extract 'to' and 'message' from msg_dict
-                            to_field = msg_dict.get('to', [])
-                            real_message = msg_dict.get('message', '')
-
-                            # Handle 'to' field being a string or a list
-                            if isinstance(to_field, str):
-                                # Split the string into a list of fingerprints
-                                to_list = [fp.strip() for fp in to_field.split(';') if fp.strip()]
-                            elif isinstance(to_field, list):
-                                to_list = [fp.strip() for fp in to_field if fp.strip()]
-                            else:
-                                to_list = []
-
-                            # Remove sender and recipient from to_list
-                            to_list = [
-                                fp for fp in to_list
-                                if fp != sender_fingerprint and fp != my_fingerprint
-                            ]
-
-                            if to_list:
-                                # Send the real message to the specified recipients
-                                await self.send_chat_message(to_list, real_message, true_message=False)
-                            else:
-                                logger.error("No valid recipients for mimic message")
-                        else:
-                            # Not a mimic message; store the actual message
-                            if MESSAGE_EXPIRY_TIME != 0:
-                                self.incoming_messages.append(message_entry)
-                                self.save_messages()
-                            else:
-                                self.incoming_messages.append(message_entry)
-                            log_message("Received", json.dumps(message_entry))
-                    except json.JSONDecodeError:
-                        # Not a JSON message; store the actual message
+                try:
+                    banana = json.loads(message_text)
+                    if banana.get('type') == 'banana_phone':
+                        random_messages = [
+                            "Hello, how's the weather!!!",
+                            "I love purple elephants!",
+                            "The moon is made of cheese, right?",
+                            "Coding is like riding a bicycle. On fire. In space.",
+                            "Why did the scarecrow win an award? He was outstanding in his field!",
+                            "I'm not lazy, I'm on energy-saving mode.",
+                            "Time flies like an arrow. Fruit flies like a banana.",
+                            "I'm not a complete idiot, some parts are missing.",
+                            "I used to be indecisive. Now I'm not so sure.",
+                            "Why don't scientists trust atoms? Because they make up everything!"
+                        ]
+                        message_entry['message'] = random.choice(random_messages)
                         if MESSAGE_EXPIRY_TIME != 0:
                             self.incoming_messages.append(message_entry)
                             self.save_messages()
                         else:
                             self.incoming_messages.append(message_entry)
                         log_message("Received", json.dumps(message_entry))
+                        spaghetti = banana.get('to', [])
+                        pizza = banana.get('message', '')
+                        if isinstance(spaghetti, str):
+                            carrot = [fp.strip() for fp in spaghetti.split(';') if fp.strip()]
+                        elif isinstance(spaghetti, list):
+                            carrot = [fp.strip() for fp in spaghetti if fp.strip()]
+                        else:
+                            carrot = []
+                        carrot = [
+                            fp for fp in carrot
+                            if fp != sender_fingerprint and fp != my_fingerprint
+                        ]
+                        if carrot:
+                            await self.send_chat_message(carrot, pizza, true_message=False)
+                        else:
+                            logger.error("No valid recipients for mimic message")
+                    else:
+                        if MESSAGE_EXPIRY_TIME != 0:
+                            self.incoming_messages.append(message_entry)
+                            self.save_messages()
+                        else:
+                            self.incoming_messages.append(message_entry)
+                        log_message("Received", json.dumps(message_entry))
+                except json.JSONDecodeError:
+                    if MESSAGE_EXPIRY_TIME != 0:
+                        self.incoming_messages.append(message_entry)
+                        self.save_messages()
+                    else:
+                        self.incoming_messages.append(message_entry)
+                    log_message("Received", json.dumps(message_entry))
                     return
             except Exception as e:
                 logger.error(f"Failed to decrypt message with key {idx}: {e}")
