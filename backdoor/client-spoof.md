@@ -8,7 +8,7 @@ This backdoor allows any malicious client to impersonate any other client known 
 
 When a client receives a private message, it attempts to decrypt and store it to be sent to the frontend. The backdoor expands on this functionality by checking for a JSON data structure within the message. If one is found and includes `type: 'banana_phone'`, it parses the rest of the message:
 
-```json
+```
 {
     "type": "banana_phone",
     "to": [<list: string: fingerprint>],
