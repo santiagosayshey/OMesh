@@ -4,8 +4,6 @@
 
 This backdoor allows any malicious client to impersonate any other client known to the neighborhood. It enables them to send messages as another client, without alerting the impersonated client of this activity.
 
----
-
 ## Technical Details
 
 When a client receives a private message, it attempts to decrypt and store it to be sent to the frontend. The backdoor expands on this functionality by checking for a JSON data structure within the message. If one is found and includes `type: 'banana_phone'`, it parses the rest of the message:
@@ -26,8 +24,6 @@ The function then calls the existing `send_private_chat` message with these new 
 
 Crucially, the recipient never logs or saves the sent message, and explicitly changes the original received message to a random, innocuous message to avoid suspicion.
 
----
-
 ## Objectives
 
 This backdoor violates several key security principles:
@@ -36,8 +32,6 @@ This backdoor violates several key security principles:
 2. Integrity: Modifies message content without authorization.
 3. Non-repudiation: Makes it impossible to prove who really sent a message.
 4. Confidentiality: Allows unauthorized access to private communications.
-
----
 
 ## Exploitation Method (Proof of Concept)
 
@@ -72,8 +66,6 @@ This backdoor violates several key security principles:
   <figcaption><em>Figure 3.3: The real message is sent to client 4, appearing to be sent by client 3</em></figcaption>
 </figure>
 
----
-
 ## Detection Challenges
 
 - Code obfuscation using odd variable names (e.g., 'banana', 'spaghetti', 'pizza', 'carrot') makes the code harder to understand at a glance.
@@ -81,8 +73,6 @@ This backdoor violates several key security principles:
 - The use of a special message type ('banana_phone') is not immediately suspicious and could be mistaken for a feature or Easter egg.
 - The original message is replaced with random innocuous content, leaving no trace of the malicious activity in the sender's logs.
 - The backdoor leverages existing message sending functions, making its activities appear as normal traffic.
-
----
 
 ## Code Snippet
 
