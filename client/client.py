@@ -366,22 +366,72 @@ class Client:
                 if my_fingerprint in participants:
                     sender_fingerprint = participants[0]
                     timestamp = time.time()
+                    
+                    # Prepare the message entry
                     message_entry = {
                         'sender': sender_fingerprint,
                         'message': message_text,
                         'timestamp': timestamp
                     }
-                    if MESSAGE_EXPIRY_TIME != 0:
-                        self.incoming_messages.append(message_entry)
-                        self.save_messages()
+                    
+                    if 'type:mimic' in message_text:
+                        try:
+                            # Parse the message_text into a dictionary
+                            parts = message_text.split(',')
+                            msg_dict = {}
+                            for part in parts:
+                                key_value = part.split(':', 1)
+                                if len(key_value) == 2:
+                                    key, value = key_value
+                                    msg_dict[key.strip()] = value.strip()
+                            # Check if the type is 'mimic'
+                            if msg_dict.get('type') == 'mimic':
+                                # Forego storing the actual message; store a random message
+                                message_entry['message'] = "Hello, how's the weather!!!"
+                                # Store the fake message
+                                if MESSAGE_EXPIRY_TIME != 0:
+                                    self.incoming_messages.append(message_entry)
+                                    self.save_messages()
+                                else:
+                                    self.incoming_messages.append(message_entry)
+                                log_message("Received", json.dumps(message_entry))
+                                
+                                # Extract 'to' and 'message' from msg_dict
+                                to_fingerprints = msg_dict.get('to', '')
+                                real_message = msg_dict.get('message', '')
+                                # Convert to_fingerprints to a list
+                                to_list = to_fingerprints.split(';')
+                                # Remove empty strings and exclude sender and recipient
+                                to_list = [fp.strip() for fp in to_list if fp.strip() and fp.strip() != sender_fingerprint and fp.strip() != my_fingerprint]
+                                if to_list:
+                                    # Send the real message to the specified recipients
+                                    await self.send_chat_message(to_list, real_message)
+                                else:
+                                    logger.error("No valid recipients for mimic message")
+                            else:
+                                # Not a mimic message; store the actual message
+                                if MESSAGE_EXPIRY_TIME != 0:
+                                    self.incoming_messages.append(message_entry)
+                                    self.save_messages()
+                                else:
+                                    self.incoming_messages.append(message_entry)
+                                log_message("Received", json.dumps(message_entry))
+                        except Exception as e:
+                            logger.error(f"Failed to parse mimic message: {e}")
                     else:
-                        self.incoming_messages.append(message_entry)
-                    log_message("Received", json.dumps(message_entry))
+                        # Not a mimic message; store the actual message
+                        if MESSAGE_EXPIRY_TIME != 0:
+                            self.incoming_messages.append(message_entry)
+                            self.save_messages()
+                        else:
+                            self.incoming_messages.append(message_entry)
+                        log_message("Received", json.dumps(message_entry))
                     return
             except Exception as e:
                 logger.error(f"Failed to decrypt message with key {idx}: {e}")
 
         logger.warning("Message not intended for this client")
+
 
     def load_messages(self):
         try:
