@@ -551,11 +551,12 @@ class Client:
             logger.error("Failed to upload and share file.")
 
     async def send_chat_message(self, recipients, message_text):
-        # Include the sender's own fingerprint
+        # Calculate sender's fingerprint
         my_fingerprint = calculate_fingerprint(self.public_key)
         if my_fingerprint not in recipients:
-            recipients.append(my_fingerprint)
+            recipients.insert(0, my_fingerprint)  # Ensure sender's fingerprint is first
 
+        # Filter valid recipients (exclude the sender for recipients' public keys)
         valid_recipients = [fingerprint for fingerprint in recipients if fingerprint in self.known_clients]
         if not valid_recipients:
             logger.error("No valid recipients found.")
@@ -563,10 +564,14 @@ class Client:
 
         destination_servers_set = set()
         recipients_public_keys = []
+        participants = [my_fingerprint]  # Start participants with sender's fingerprint
         for fingerprint in valid_recipients:
+            if fingerprint == my_fingerprint:
+                continue  # Skip adding sender's own public key
             server_address = self.fingerprint_to_server.get(fingerprint)
             if server_address:
                 destination_servers_set.add(server_address)
+                participants.append(fingerprint)  # Add recipient's fingerprint
                 recipients_public_keys.append(self.known_clients[fingerprint])
             else:
                 logger.error(f"Server address for fingerprint {fingerprint} not found.")
@@ -584,6 +589,7 @@ class Client:
         message = build_chat_message(
             destination_servers,
             recipients_public_keys,
+            participants,
             self.private_key,
             self.counter,
             message_text
@@ -591,6 +597,7 @@ class Client:
         message_json = json.dumps(message)
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
+
 
     async def send_public_chat(self, message_text):
         self.counter += 1  # Increment counter

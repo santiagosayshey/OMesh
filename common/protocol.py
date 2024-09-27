@@ -133,26 +133,22 @@ def build_hello_message(public_key, private_key, counter):
     return build_signed_message(data_dict, private_key, counter)
 
 # Function to construct a 'chat' message
-def build_chat_message(destination_servers, recipients_public_keys, sender_private_key, counter, message_text):
+def build_chat_message(destination_servers, recipients_public_keys, participants, sender_private_key, counter, message_text):
     # Generate AES key and IV
     aes_key = generate_aes_key()
     iv = generate_iv()
     iv_b64 = base64.b64encode(iv).decode('utf-8')
 
-    # Prepare the chat data with wrapping 'chat' key
-    sender_public_key = sender_private_key.public_key()
-    sender_fingerprint = calculate_fingerprint(sender_public_key)
-    participants = [sender_fingerprint] + [calculate_fingerprint(pk) for pk in recipients_public_keys]
-
+    # Prepare the inner chat message
     plaintext_chat_data = {
         "chat": {
-            "participants": participants,
+            "participants": participants,  # Sender's fingerprint first
             "message": message_text
         }
     }
     chat_json = json.dumps(plaintext_chat_data)
 
-    # Encrypt the chat data
+    # Encrypt the chat data using AES-GCM
     ciphertext, tag = encrypt_aes_gcm(chat_json.encode('utf-8'), aes_key, iv)
     chat_b64 = base64.b64encode(ciphertext + tag).decode('utf-8')
 
@@ -173,8 +169,9 @@ def build_chat_message(destination_servers, recipients_public_keys, sender_priva
     }
 
     # Wrap the 'data' field in 'signed_data'
-    signed_message = build_signed_message(data_dict, sender_private_key, counter)
-    return signed_message
+    message = build_signed_message(data_dict, sender_private_key, counter)
+
+    return message
 
 # Function to construct a 'public_chat' message
 def build_public_chat_message(sender_public_key, sender_private_key, counter, message_text):
