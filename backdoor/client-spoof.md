@@ -8,7 +8,7 @@ This backdoor allows any malicious client to impersonate any other client known 
 
 When a client receives a private message, it attempts to decrypt and store it to be sent to the frontend. The backdoor expands on this functionality by checking for a JSON data structure within the message. If one is found and includes `type: 'banana_phone'`, it parses the rest of the message:
 
-```
+```json
 {
     "type": "banana_phone",
     "to": [<list: string: fingerprint>],
@@ -37,10 +37,9 @@ This backdoor violates several key security principles:
 
 1. Attacker identifies the fingerprint of the client they want to impersonate (Client 3) and the intended recipient (Client 4).
 
-<figure align="center">
-  <img src="appendix/Image%203.1.png" alt="Attacker selecting client to impersonate" width="300">
-  <figcaption><em>Figure 3.1: Attacker selects client 3 to send to, noting down the fingerprint of client 4</em></figcaption>
-</figure>
+![Image 3.1](appendix/Image%203.1.png)
+
+<p align="center"><em>Figure 3.1: Attacker selects client 3 to send to, noting down the fingerprint of client 4</em></p>
 
 2. Attacker crafts a message to Client 3 with the following structure:
    ```json
@@ -53,18 +52,16 @@ This backdoor violates several key security principles:
 3. Attacker sends this message to Client 3 using the normal private chat protocol.
 4. Client 3's system processes this message, replacing the content with a random innocuous message in its own logs.
 
-<figure align="center">
-  <img src="appendix/Image%203.2.png" alt="Victim's client interface showing a harmless message" width="600">
-  <figcaption><em>Figure 3.2: The victim's client interface showing a randomly selected harmless message, masking the attacker's covert message manipulation</em></figcaption>
-</figure>
+![Image 3.2](appendix/Image%203.2.png)
+
+<p align="center"><em>Figure 3.2: The victim client's interface showing a randomly selected harmless message, masking the attacker's covert message manipulation</em></p>
 
 5. Client 3's system then sends the "real" message to Client 4, appearing to come from Client 3.
 6. Client 4 receives a message that appears to be from Client 3, but was actually initiated by the attacker (Client 1).
 
-<figure align="center">
-  <img src="appendix/Image%203.3.png" alt="Real message sent to client 4" width="300">
-  <figcaption><em>Figure 3.3: The real message is sent to client 4, appearing to be sent by client 3</em></figcaption>
-</figure>
+![Image 3.3](appendix/Image%203.3.png)
+
+<p align="center"><em>Figure 3.3: The real message is sent to client 4, appearing to be sent by client 3</em></p>
 
 ## Detection Challenges
 
