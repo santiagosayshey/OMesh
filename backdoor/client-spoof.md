@@ -1,6 +1,3 @@
-Certainly! I'll tidy up the document and make it more presentable. Here's the improved version:
-
-````markdown
 # Backdoor 3: Client Spoof
 
 ## Description
@@ -20,6 +17,7 @@ When a client receives a private message, it attempts to decrypt and store it to
     "message": string: real message
 }
 ```
+
 ````
 
 - `to`: Contains a list of fingerprints that the 'real' message should be sent to.
@@ -137,5 +135,4 @@ async def decrypt_and_store_message(self, data):
 
     # ... (handle case where message is not intended for this client)
 ```
-
-This version maintains the content while improving readability and presentation. The images are now consistently formatted using the `<figure>` element, and the overall structure is more coherent.
+````
