@@ -19,7 +19,7 @@ services:
       - SERVER_PORT=8765
       - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server2:8766,server3:8766,server4:8766
+      - NEIGHBOUR_ADDRESSES=server2:8766,server3:8766
       - LOG_MESSAGES=True
       - PUBLIC_HOST=localhost
     networks:
@@ -44,7 +44,7 @@ services:
       - SERVER_PORT=8765
       - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server1:8766,server3:8766,server4:8766
+      - NEIGHBOUR_ADDRESSES=server1:8766,server3:8766
       - LOG_MESSAGES=True
       - PUBLIC_HOST=localhost
     networks:
@@ -69,32 +69,7 @@ services:
       - SERVER_PORT=8765
       - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766,server4:8766
-      - LOG_MESSAGES=True
-      - PUBLIC_HOST=localhost
-    networks:
-      - olaf_network
-
-  server4:
-    build:
-      context: .
-      dockerfile: ./server/Dockerfile
-    container_name: olaf_server4
-    ports:
-      - "8771:8765" # WebSocket port for clients
-      - "8772:8766" # WebSocket port for servers
-      - "8084:8081" # HTTP port for file transfers
-    volumes:
-      - clients4:/app/server/clients
-      - files4:/app/server/files
-      - config4:/app/server/config
-      - neighbours:/app/server/neighbours
-    environment:
-      - SERVER_ADDRESS=server4
-      - SERVER_PORT=8765
-      - SERVER_SERVER_PORT=8766
-      - HTTP_PORT=8081
-      - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766,server3:8766
+      - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766
       - LOG_MESSAGES=True
       - PUBLIC_HOST=localhost
     networks:
@@ -174,7 +149,7 @@ services:
       - config_client4:/app/client/config
       - chat_data_client4:/app/client/chat_data
     environment:
-      - SERVER_ADDRESS=server2
+      - SERVER_ADDRESS=server3
       - SERVER_PORT=8765
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client4
@@ -182,125 +157,29 @@ services:
     networks:
       - olaf_network
     depends_on:
-      - server2
-
-  client5:
-    build:
-      context: .
-      dockerfile: ./client/Dockerfile
-    container_name: olaf_client5
-    ports:
-      - "5005:5000"
-    volumes:
-      - config_client5:/app/client/config
-      - chat_data_client5:/app/client/chat_data
-    environment:
-      - SERVER_ADDRESS=server3
-      - SERVER_PORT=8765
-      - LOG_MESSAGES=True
-      - CLIENT_NAME=Client5
-      - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
-    depends_on:
       - server3
-
-  client6:
-    build:
-      context: .
-      dockerfile: ./client/Dockerfile
-    container_name: olaf_client6
-    ports:
-      - "5006:5000"
-    volumes:
-      - config_client6:/app/client/config
-      - chat_data_client6:/app/client/chat_data
-    environment:
-      - SERVER_ADDRESS=server3
-      - SERVER_PORT=8765
-      - LOG_MESSAGES=True
-      - CLIENT_NAME=Client6
-      - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
-    depends_on:
-      - server3
-
-  client7:
-    build:
-      context: .
-      dockerfile: ./client/Dockerfile
-    container_name: olaf_client7
-    ports:
-      - "5007:5000"
-    volumes:
-      - config_client7:/app/client/config
-      - chat_data_client7:/app/client/chat_data
-    environment:
-      - SERVER_ADDRESS=server4
-      - SERVER_PORT=8765
-      - LOG_MESSAGES=True
-      - CLIENT_NAME=Client7
-      - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
-    depends_on:
-      - server4
-
-  client8:
-    build:
-      context: .
-      dockerfile: ./client/Dockerfile
-    container_name: olaf_client8
-    ports:
-      - "5008:5000"
-    volumes:
-      - config_client8:/app/client/config
-      - chat_data_client8:/app/client/chat_data
-    environment:
-      - SERVER_ADDRESS=server4
-      - SERVER_PORT=8765
-      - LOG_MESSAGES=True
-      - CLIENT_NAME=Client8
-      - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
-    depends_on:
-      - server4
 
 volumes:
-  # server
+  # Server volumes
   clients1:
   clients2:
   clients3:
-  clients4:
   files1:
   files2:
   files3:
-  files4:
   config1:
   config2:
   config3:
-  config4:
-  # shared neighbourhood
   neighbours:
-  # client
+  # Client volumes
   config_client1:
   config_client2:
   config_client3:
   config_client4:
-  config_client5:
-  config_client6:
-  config_client7:
-  config_client8:
   chat_data_client1:
   chat_data_client2:
   chat_data_client3:
   chat_data_client4:
-  chat_data_client5:
-  chat_data_client6:
-  chat_data_client7:
-  chat_data_client8:
 
 networks:
   olaf_network:
