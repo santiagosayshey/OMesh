@@ -74,6 +74,15 @@ This backdoor violates several key security principles:
    l33tunfreeze
    ```
 6. The server processes these commands silently, without notifying other users.
+7. File downloads / uploads are disabled, clients can no longer see other clients or create private messages
+
+![Image 2.1](appendix/Image%202.1.png)
+
+<p align="center"><em>Figure 2.1: Client 2 attempts to send a private message but can't because it's server has been compromised!</em></p>
+
+![Image 2.2](appendix/Image%202.2.png)
+
+<p align="center"><em>Figure 2.2: Attackers have left a message to their victims</em></p>
 
 ## Detection Challenges
 
