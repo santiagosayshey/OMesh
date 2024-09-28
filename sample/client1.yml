@@ -1,0 +1,28 @@
+version: "3.8"
+services:
+  client1:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client1
+    ports:
+      - "5001:5000"
+    volumes:
+      - config_client1:/app/client/config
+      - chat_data_client1:/app/client/chat_data
+    environment:
+      - SERVER_ADDRESS=server1
+      - SERVER_PORT=8765
+      - LOG_MESSAGES=True
+      - CLIENT_NAME=Client1
+      - MESSAGE_EXPIRY_TIME=-1
+    networks:
+      - olaf_network
+
+volumes:
+  config_client1:
+  chat_data_client1:
+
+networks:
+  olaf_network:
+    driver: bridge

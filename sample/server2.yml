@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  server2:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server2
+    ports:
+      - "8767:8765" # WebSocket port for clients
+      - "8768:8766" # WebSocket port for servers
+      - "8082:8081" # HTTP port for file transfers
+    volumes:
+      - clients2:/app/server/clients
+      - files2:/app/server/files
+      - config2:/app/server/config
+      - neighbours:/app/server/neighbours
+    environment:
+      - SERVER_ADDRESS=server2
+      - SERVER_PORT=8767
+      - SERVER_SERVER_PORT=8768
+      - HTTP_PORT=8082
+      - NEIGHBOUR_ADDRESSES=server1:8766
+      - LOG_MESSAGES=True
+      - PUBLIC_HOST=localhost
+    networks:
+      - olaf_network
+
+volumes:
+  clients2:
+  files2:
+  config2:
+  neighbours:
+
+networks:
+  olaf_network:
+    driver: bridge
