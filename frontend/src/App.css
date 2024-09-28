@@ -1,0 +1,52 @@
+/* Custom Scrollbar for Light Mode */
+.message-pane::-webkit-scrollbar {
+  width: 8px;
+}
+
+.message-pane::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.message-pane::-webkit-scrollbar-thumb {
+  background-color: #c1c1c1;
+  border-radius: 4px;
+  border: 2px solid #f1f1f1;
+  transition: background-color 0.3s ease;
+}
+
+.message-pane::-webkit-scrollbar-thumb:hover {
+  background-color: #a1a1a1;
+}
+
+/* Custom Scrollbar for Dark Mode */
+.dark .message-pane::-webkit-scrollbar-track {
+  background: #1e293b; /* dark-100 */
+}
+
+.dark .message-pane::-webkit-scrollbar-thumb {
+  background-color: #334155; /* dark-200 */
+  border: 2px solid #1e293b; /* dark-100 */
+  transition: background-color 0.3s ease;
+}
+
+.dark .message-pane::-webkit-scrollbar-thumb:hover {
+  background-color: #475569; /* dark-300 */
+}
+
+/* For Firefox */
+.message-pane {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+.message-pane:hover {
+  scrollbar-color: #a1a1a1 #f1f1f1;
+}
+
+.dark .message-pane {
+  scrollbar-color: #334155 #1e293b; /* dark-200 and dark-100 */
+}
+
+.dark .message-pane:hover {
+  scrollbar-color: #475569 #1e293b; /* dark-300 and dark-100 */
+}
