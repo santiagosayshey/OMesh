@@ -80,7 +80,7 @@ class Server:
         # Mapping of client fingerprints to their respective servers
         self.fingerprint_to_server = {}  # {fingerprint: server_address}
 
-        # Generate public/private key pair and write public key to 'neighbours' directory
+        # Generate public/private key pair
         self.private_key, self.public_key = self.load_or_generate_keys()
 
         # Ensure directories exist
@@ -88,9 +88,6 @@ class Server:
         os.makedirs(FILES_DIR, exist_ok=True)
         os.makedirs(CONFIG_DIR, exist_ok=True)
         os.makedirs(NEIGHBOURS_DIR, exist_ok=True)  # Ensure the 'neighbours' directory exists
-
-        # Write the public key to the 'neighbours' directory
-        self.write_public_key_to_neighbours()
 
         # Initialize counters for servers
         self.server_counters = {}
@@ -127,20 +124,10 @@ class Server:
 
         return private_key, public_key
 
-    def write_public_key_to_neighbours(self):
-        public_pem = export_public_key(self.public_key)
-        neighbours_dir = NEIGHBOURS_DIR
-        os.makedirs(neighbours_dir, exist_ok=True)
-        key_filename = f'{self.address}_{self.server_ws_port}_public_key.pem'
-        key_filepath = os.path.join(neighbours_dir, key_filename)
-        with open(key_filepath, 'wb') as f:
-            f.write(public_pem)
-        logger.info(f"Written public key to neighbours directory: {key_filepath}")
-
     def load_neighbour_public_keys(self):
         """
         Loads the public keys of neighbour servers from files.
-        The files should be named as '<address>_<port>_public_key.pem' and stored in 'neighbours' directory.
+        The files should be stored in 'neighbours' directory.
         """
         neighbour_public_keys = {}
         neighbours_dir = NEIGHBOURS_DIR
@@ -156,7 +143,7 @@ class Server:
                 neighbour_public_keys[(address, port)] = public_key
                 logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
             else:
-                logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
+                logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}. Please make sure you have added this key on the /upload_key page and restart your server.")
         return neighbour_public_keys
 
     def load_maintenance_mode(self):
@@ -188,23 +175,34 @@ class Server:
         client_server = await websockets.serve(
             self.handle_client_connection, self.address, self.client_ws_port, ping_interval=5
         )
+        logger.info(f"WebSocket server for clients listening on {self.address}:{self.client_ws_port}")
+
         # Start WebSocket server for other servers
         server_server = await websockets.serve(
             self.handle_server_connection, self.address, self.server_ws_port
         )
+        logger.info(f"WebSocket server for servers listening on {self.address}:{self.server_ws_port}")
 
-        # Start HTTP server for file transfers
+        # Start HTTP server for file transfers and endpoints
         app = web.Application()
         app.router.add_post('/api/upload', self.handle_file_upload)
         app.router.add_get('/files/{filename}', self.handle_file_download)
         app.router.add_get('/files', self.handle_file_list)
         app.router.add_get('/', self.handle_root)
+
+        # Add the new endpoints
+        app.router.add_get('/pub', self.handle_get_public_key)
+        app.router.add_get('/upload_key', self.handle_upload_key_page)
+        app.router.add_post('/upload_key', self.handle_upload_key)
+
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', self.http_port)
+        await site.start()
+        logger.info(f"HTTP server listening on 0.0.0.0:{self.http_port}")
+
         # Initialize the server's start time
         self.start_time = None
-        await site.start()
 
         # Start connecting to neighbours
         asyncio.ensure_future(self.connect_to_neighbours())
@@ -265,6 +263,7 @@ class Server:
                     logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
                     return None
         return None
+
 
     async def handle_client_connection(self, websocket, path):
         client_ip, client_port = websocket.remote_address
@@ -375,10 +374,14 @@ class Server:
         Broadcasts the current client list to all connected servers.
         Each server will receive only the clients connected to this server.
         """
+        if not hasattr(self, 'server_to_clients'):
+            self.server_to_clients = {}
+
         # Prepare client_update message with only the clients connected to this server
         clients_public_keys = [
-            public_key for fingerprint, public_key in self.client_public_keys.items()
-            if self.fingerprint_to_server.get(fingerprint) == self.address
+            self.client_public_keys[fingerprint]
+            for fingerprint, server_address in self.fingerprint_to_server.items()
+            if server_address == self.address
         ]
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
@@ -392,6 +395,7 @@ class Server:
                 logger.info(f"Sent client update to server {server_address}.")
             except Exception as e:
                 logger.error(f"Error sending client update to server {server_address}: {e}")
+
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
         if self.maintenance_mode:
@@ -471,6 +475,8 @@ class Server:
         if not validate_message_format(message_dict):
             logger.error("Invalid message format from server")
             logger.error(f"Erroneous message: {message_dict}")
+            # Close the connection
+            await websocket.close()
             return
 
         # Check if the message is of type 'signed_data'
@@ -484,12 +490,16 @@ class Server:
                 sender_address = data_dict.get("sender")
                 if not sender_address:
                     logger.error("Missing sender address in 'server_hello' message")
+                    # Close the connection
+                    await websocket.close()
                     return
 
                 # Get the public key of the sender
                 public_key = self.get_neighbour_public_key(sender_address)
                 if not public_key:
                     logger.error(f"Unknown sender {sender_address}, cannot verify signature")
+                    # Close the connection
+                    await websocket.close()
                     return
 
                 # Get the last counter for this sender
@@ -501,6 +511,8 @@ class Server:
                 if not is_valid:
                     logger.error(f"Invalid signed 'server_hello' message from {sender_address}: {error}")
                     logger.error(f"Erroneous message: {message_dict}")
+                    # Close the connection
+                    await websocket.close()
                     return
 
                 # Update the counter
@@ -520,7 +532,6 @@ class Server:
                     await self.handle_public_chat(message_dict, from_client=False)
                 else:
                     logger.warning(f"Received unexpected signed data type from server: {data_type}")
-
         else:
             # Non-signed messages
             message_type = message_dict.get("type")
@@ -536,15 +547,37 @@ class Server:
                     logger.warning("Received 'client_update' from an unknown server.")
                     return
 
+                # Initialize the server_to_clients mapping if not present
+                if not hasattr(self, 'server_to_clients'):
+                    self.server_to_clients = {}  # {server_address: set(fingerprints)}
+
+                # Get the set of existing clients associated with this server
+                existing_clients = self.server_to_clients.get(server_address, set())
+
+                # Build the new set of clients from the incoming message
+                new_clients = set()
                 for public_key_pem_str in clients_pem:
                     public_key_pem = public_key_pem_str.encode('utf-8')
                     public_key = load_public_key(public_key_pem)
                     fingerprint = calculate_fingerprint(public_key)
-                    self.client_public_keys[fingerprint] = public_key
+                    new_clients.add(fingerprint)
 
-                    # Update the fingerprint-to-server mapping
+                    # Update client_public_keys and fingerprint_to_server
+                    self.client_public_keys[fingerprint] = public_key
                     self.fingerprint_to_server[fingerprint] = server_address
                     logger.info(f"Client {fingerprint} is associated with server {server_address}.")
+
+                # Determine clients to remove (those in existing_clients but not in new_clients)
+                clients_to_remove = existing_clients - new_clients
+
+                for fingerprint in clients_to_remove:
+                    # Remove from client_public_keys and fingerprint_to_server
+                    self.client_public_keys.pop(fingerprint, None)
+                    self.fingerprint_to_server.pop(fingerprint, None)
+                    logger.info(f"Removed client {fingerprint} from server {server_address}.")
+
+                # Update the server_to_clients mapping
+                self.server_to_clients[server_address] = new_clients
 
                 logger.info(f"Updated client list from server {server_address}.")
 
@@ -566,7 +599,11 @@ class Server:
                 logger.info(f"Mapped websocket to server {sender_address}.")
 
             else:
-                logger.warning(f"Unknown message type from server: {message_type}")
+                logger.warning(f"Unknown message type '{message_type}' from server.")
+                # Close the connection
+                await websocket.close()
+                return
+
 
     async def forward_message(self, message_dict):
         data = message_dict.get('data', {})
@@ -735,6 +772,77 @@ class Server:
             return web.Response(text="all your server are belong to us")
         # Return a funny message
         return web.Response(text="What are you doing here? 🤔")
+    
+    # Add new methods for the endpoints
+    async def handle_get_public_key(self, request):
+        """
+        Returns the server's public key as a PEM-formatted string.
+        """
+        public_pem = export_public_key(self.public_key).decode('utf-8')
+        return web.Response(text=public_pem, content_type='text/plain')
+
+    async def handle_upload_key_page(self, request):
+        """
+        Serves an HTML page with a form to upload a public key file.
+        """
+        html = '''
+        <html>
+        <body>
+            <h1>Upload Public Key</h1>
+            <form action="/upload_key" method="post" enctype="multipart/form-data">
+                Address: <input type="text" name="address" required><br>
+                Port: <input type="text" name="port" required><br>
+                Public Key File: <input type="file" name="file" accept=".pem" required><br>
+                <input type="submit" value="Upload">
+            </form>
+        </body>
+        </html>
+        '''
+        return web.Response(text=html, content_type='text/html')
+
+    async def handle_upload_key(self, request):
+        """
+        Handles the uploaded public key file and saves it to the neighbours directory.
+        """
+        reader = await request.multipart()
+        # Read address field
+        field = await reader.next()
+        if field.name != 'address':
+            return web.Response(text="Missing 'address' field.", status=400)
+        address = await field.text()
+
+        # Read port field
+        field = await reader.next()
+        if field.name != 'port':
+            return web.Response(text="Missing 'port' field.", status=400)
+        port = await field.text()
+
+        # Read file field
+        field = await reader.next()
+        if field.name != 'file':
+            return web.Response(text="Missing 'file' field.", status=400)
+        filename = field.filename
+        if not filename.endswith('.pem'):
+            return web.Response(text="Invalid file type. Only .pem files are accepted.", status=400)
+
+        # Save the uploaded file
+        key_filename = f"{address}_{port}_public_key.pem"
+        key_filepath = os.path.join(NEIGHBOURS_DIR, key_filename)
+        size = 0
+        with open(key_filepath, 'wb') as f:
+            while True:
+                chunk = await field.read_chunk()
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > 10 * 1024:  # Limit file size to 10KB
+                    return web.Response(text="File size exceeds limit.", status=413)
+                f.write(chunk)
+
+        # Reload the neighbour public keys
+        self.neighbour_public_keys = self.load_neighbour_public_keys()
+
+        return web.Response(text=f"Public key for {address}:{port} uploaded successfully.", status=200)
 
 def log_message(direction, message):
     if direction == "Received":

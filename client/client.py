@@ -14,7 +14,10 @@ from flask import Flask, render_template, request, jsonify
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Disable lower-level logs
@@ -22,7 +25,8 @@ logging.getLogger('websockets').setLevel(logging.WARNING)
 logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 # Enable detailed message logging based on the LOG_MESSAGES environment variable
-LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true','1', 't')
+LOG_MESSAGES = os.environ.get('LOG_MESSAGES', 'False').lower() in ('true', '1', 't')
+
 # Get client name from ENV
 CLIENT_NAME = os.environ.get('CLIENT_NAME', f"Client_{os.getpid()}")
 
@@ -68,6 +72,7 @@ app = Flask(__name__)
 
 os.makedirs('uploads', exist_ok=True)
 
+
 def log_message(direction, message):
     # Always log the basic message direction
     logger.info(f"{direction} message.")
@@ -107,10 +112,11 @@ def sanitize_message(message):
         message_copy['signature'] = "[OMITTED]"
     return message_copy
 
+
 class Client:
     def __init__(self):
         self.server_address = SERVER_ADDRESS
-        self.server_port = SERVER_PORT  # Added server_port
+        self.server_port = SERVER_PORT
         self.websocket = None
         self.private_key = None
         self.public_key = None
@@ -147,7 +153,7 @@ class Client:
 
         # Start
         asyncio.set_event_loop(self.loop)
-    
+
     def handle_shutdown(self, signum, frame):
         logger.info("Received shutdown signal")
         asyncio.run_coroutine_threadsafe(self.close_connection(), self.loop)
@@ -256,11 +262,28 @@ class Client:
         else:
             logger.warning("Unknown message type received.")
             return
+
         data = message_dict.get('data', {})
+
         if message_type == 'signed_data':
             # Handle signed_data message
             await self.handle_signed_data_message(message_dict)
+
         elif message_type == 'client_list':
+            # Log the entire client_list message for debugging
+            logger.info("Received 'client_list' message:")
+            try:
+                # Pretty-print the client_list message
+                pretty_client_list = json.dumps(message_dict, indent=2)
+                logger.info(pretty_client_list)
+            except Exception as e:
+                logger.error(f"Failed to pretty-print client_list message: {e}")
+                logger.info(f"Raw client_list message: {message_dict}")
+
+            # Create new dictionaries to replace the old ones
+            new_known_clients = {}
+            new_fingerprint_to_server = {}
+
             # Update known clients and fingerprint_to_server mapping
             servers = message_dict.get('servers', [])
             for server_entry in servers:
@@ -270,12 +293,23 @@ class Client:
                     public_key_pem = public_key_pem_str.encode('utf-8')
                     public_key = load_public_key(public_key_pem)
                     fingerprint = calculate_fingerprint(public_key)
-                    self.known_clients[fingerprint] = public_key
-                    self.fingerprint_to_server[fingerprint] = server_address
+                    new_known_clients[fingerprint] = public_key
+                    new_fingerprint_to_server[fingerprint] = server_address
+
+            # Ensure own public key is included
+            my_fingerprint = calculate_fingerprint(self.public_key)
+            new_known_clients[my_fingerprint] = self.public_key
+            new_fingerprint_to_server[my_fingerprint] = self.server_address
+
+            # Replace the old dictionaries with the new ones
+            self.known_clients = new_known_clients
+            self.fingerprint_to_server = new_fingerprint_to_server
+
+            logger.info(f"Known clients after update: {list(self.known_clients.keys())}")
             logger.info("Updated client list and fingerprint-to-server mapping.")
 
         elif message_type == 'client_update':
-            # Update known clients and fingerprint_to_server mapping
+            # Existing client_update handling
             clients_pem = message_dict.get('clients', [])
             for public_key_pem_str in clients_pem:
                 public_key_pem = public_key_pem_str.encode('utf-8')
@@ -288,6 +322,7 @@ class Client:
         elif message_type == 'chat':
             # Handle chat message
             await self.decrypt_and_store_message(data)
+
         elif message_type == 'public_chat':
             # Handle public chat message
             sender_fingerprint = data.get('sender')
@@ -304,6 +339,7 @@ class Client:
             else:
                 self.incoming_messages.append(message_entry)
             log_message("Received", json.dumps(message_entry))
+
         else:
             logger.warning(f"Unknown message type: {message_type}")
 
@@ -356,6 +392,8 @@ class Client:
                 symm_key = decrypt_rsa_oaep(symm_key_encrypted, private_key)
                 plaintext_bytes = decrypt_aes_gcm(ciphertext, symm_key, iv, tag)
                 chat_data = json.loads(plaintext_bytes.decode('utf-8'))
+
+                # Extract the 'chat' key as per the corrected structure
 
                 chat_content = chat_data.get('chat', {})
                 participants = chat_content.get('participants', [])
@@ -475,6 +513,9 @@ class Client:
         # Start Flask app
         app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
+    async def get_known_clients(self):
+        return list(self.known_clients.keys())
+
     # Flask routes
     @app.route('/')
     def index():
@@ -482,7 +523,17 @@ class Client:
 
     @app.route('/get_clients', methods=['GET'])
     def get_clients():
-        fingerprints = list(client_instance.known_clients.keys())
+        loop = client_instance.loop
+        future = asyncio.run_coroutine_threadsafe(
+            client_instance.get_known_clients(),
+            loop
+        )
+        try:
+            fingerprints = future.result(timeout=5)  # Wait up to 5 seconds
+            logger.info(f"Known clients at the time of request: {fingerprints}")
+        except Exception as e:
+            logger.error(f"Error retrieving known clients: {e}")
+            fingerprints = []
         return jsonify({'clients': fingerprints})
 
     @app.route('/send_message', methods=['POST'])
@@ -546,7 +597,6 @@ class Client:
             'http_port': client_instance.http_port,
             'public_host': PUBLIC_HOST
         })
-
 
     @app.route('/upload_file', methods=['POST'])
     def upload_file_route():
@@ -656,8 +706,6 @@ class Client:
                 self.save_messages()
             else:
                 self.incoming_messages.append(message_entry)
-
-
 
     async def send_public_chat(self, message_text):
         self.counter += 1  # Increment counter
