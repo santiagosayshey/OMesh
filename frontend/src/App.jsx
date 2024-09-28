@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import "./App.css";
 
 // Alert Component
 const Alert = ({ id, message, onClose }) => {
@@ -12,7 +13,7 @@ const Alert = ({ id, message, onClose }) => {
 
   return (
     <div
-      className="max-w-sm w-full bg-green-600 text-white px-4 py-3 rounded shadow-lg flex items-center justify-between animate-fade-in-down"
+      className="max-w-sm w-full bg-green-600 text-white px-4 py-3 rounded shadow-lg flex items-center justify-between animate-fade-in-down relative"
       role="alert"
     >
       <span className="font-medium">{message}</span>
@@ -492,7 +493,7 @@ function OlafChatClient() {
 
           {/* Message pane */}
           <div
-            className="flex-grow overflow-y-auto bg-gray-200 p-4 rounded-lg dark:bg-gray-800"
+            className="h-192 overflow-y-auto bg-gray-200 p-4 rounded-lg dark:bg-gray-800 message-pane"
             ref={messagePaneRef}
           >
             {/* Display selected recipients */}

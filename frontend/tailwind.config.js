@@ -10,6 +10,9 @@ module.exports = {
           300: "#475569",
         },
       },
+      spacing: {
+        192: "42rem",
+      },
     },
   },
   darkMode: "class",
