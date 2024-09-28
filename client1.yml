@@ -13,6 +13,7 @@ services:
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
+      - HTTP_PORT=8081
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client1
       - MESSAGE_EXPIRY_TIME=-1
