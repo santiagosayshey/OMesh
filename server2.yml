@@ -8,7 +8,7 @@ services:
     ports:
       - "8767:8765" # WebSocket port for clients
       - "8768:8766" # WebSocket port for servers
-      - "8082:8081" # HTTP port for file transfers
+      - "8082:8082" # HTTP port for file transfers
     volumes:
       - clients2:/app/server/clients
       - files2:/app/server/files
