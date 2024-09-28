@@ -84,9 +84,11 @@ class TestMessageStructureCompliance(unittest.TestCase):
         Expected Structure: Matches the protocol specification.
         """
         message_text = "Hello, this is a test message."
+        participants = [self.sender_fingerprint, self.recipient_fingerprint]
         message = build_chat_message(
             self.destination_servers,
             self.recipients_public_keys,
+            participants,
             self.private_key_sender,
             self.counter,
             message_text
@@ -118,9 +120,11 @@ class TestMessageStructureCompliance(unittest.TestCase):
         Expected Result: Message validation fails due to missing 'symm_keys'.
         """
         message_text = "Hello, this is a test message."
+        participants = [self.sender_fingerprint, self.recipient_fingerprint]
         message = build_chat_message(
             self.destination_servers,
             self.recipients_public_keys,
+            participants,
             self.private_key_sender,
             self.counter,
             message_text
@@ -134,6 +138,7 @@ class TestMessageStructureCompliance(unittest.TestCase):
         )
         if not is_valid:
             print("Actual Result: Message validation failed as expected due to missing 'symm_keys'.")
+
 
     def test_public_chat_message_structure(self):
         """
@@ -212,7 +217,6 @@ class TestMessageStructureCompliance(unittest.TestCase):
         """
         sender_address = "server1"
         self.counter += 1
-        # Note: Adjusted to pass in private_key and counter
         message = build_server_hello(sender_address, self.private_key_sender, self.counter)
         expected_structure = {
             "type": "signed_data",
@@ -224,14 +228,14 @@ class TestMessageStructureCompliance(unittest.TestCase):
             "signature": str,
         }
         is_valid = self._compare_structure(message, expected_structure)
-        if is_valid:
-            print("Actual Result: Server hello message matches the expected structure.")
-        else:
-            print(f"Actual Result: Server hello message does not match expected structure.\nActual message:\n{json.dumps(message, indent=2)}")
         self.assertTrue(
             is_valid,
             f"Server hello message does not match expected structure.\nActual message:\n{json.dumps(message, indent=2)}"
         )
+        if is_valid:
+            print("Actual Result: Server hello message matches the expected structure.")
+        else:
+            print(f"Actual Result: Server hello message does not match expected structure.\nActual message:\n{json.dumps(message, indent=2)}")
 
     def _compare_structure(self, actual, expected):
         """
