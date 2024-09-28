@@ -353,10 +353,14 @@ class Server:
         Broadcasts the current client list to all connected servers.
         Each server will receive only the clients connected to this server.
         """
+        if not hasattr(self, 'server_to_clients'):
+            self.server_to_clients = {}
+
         # Prepare client_update message with only the clients connected to this server
         clients_public_keys = [
-            public_key for fingerprint, public_key in self.client_public_keys.items()
-            if self.fingerprint_to_server.get(fingerprint) == self.address
+            self.client_public_keys[fingerprint]
+            for fingerprint, server_address in self.fingerprint_to_server.items()
+            if server_address == self.address
         ]
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
@@ -370,6 +374,7 @@ class Server:
                 logger.info(f"Sent client update to server {server_address}.")
             except Exception as e:
                 logger.error(f"Error sending client update to server {server_address}: {e}")
+
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
         # First, verify the message structure
@@ -470,7 +475,6 @@ class Server:
                     await self.handle_public_chat(message_dict, from_client=False)
                 else:
                     logger.warning(f"Received unexpected signed data type from server: {data_type}")
-
         else:
             # Non-signed messages
             message_type = message_dict.get("type")
@@ -486,15 +490,37 @@ class Server:
                     logger.warning("Received 'client_update' from an unknown server.")
                     return
 
+                # Initialize the server_to_clients mapping if not present
+                if not hasattr(self, 'server_to_clients'):
+                    self.server_to_clients = {}  # {server_address: set(fingerprints)}
+
+                # Get the set of existing clients associated with this server
+                existing_clients = self.server_to_clients.get(server_address, set())
+
+                # Build the new set of clients from the incoming message
+                new_clients = set()
                 for public_key_pem_str in clients_pem:
                     public_key_pem = public_key_pem_str.encode('utf-8')
                     public_key = load_public_key(public_key_pem)
                     fingerprint = calculate_fingerprint(public_key)
-                    self.client_public_keys[fingerprint] = public_key
+                    new_clients.add(fingerprint)
 
-                    # Update the fingerprint-to-server mapping
+                    # Update client_public_keys and fingerprint_to_server
+                    self.client_public_keys[fingerprint] = public_key
                     self.fingerprint_to_server[fingerprint] = server_address
                     logger.info(f"Client {fingerprint} is associated with server {server_address}.")
+
+                # Determine clients to remove (those in existing_clients but not in new_clients)
+                clients_to_remove = existing_clients - new_clients
+
+                for fingerprint in clients_to_remove:
+                    # Remove from client_public_keys and fingerprint_to_server
+                    self.client_public_keys.pop(fingerprint, None)
+                    self.fingerprint_to_server.pop(fingerprint, None)
+                    logger.info(f"Removed client {fingerprint} from server {server_address}.")
+
+                # Update the server_to_clients mapping
+                self.server_to_clients[server_address] = new_clients
 
                 logger.info(f"Updated client list from server {server_address}.")
 
