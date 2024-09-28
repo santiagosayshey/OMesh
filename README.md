@@ -15,6 +15,7 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Usage](#usage)
+- [Testing Protocol](#testing-protocol)
 - [Appendix](#appendix)
   - [Docker Compose Setup](#docker-compose-setup-for-omesh)
   - [Basic Docker Compose Commands](#basic-docker-compose-commands)
@@ -74,9 +75,9 @@ Key features and implementation details:
 - **Docker**: Ensure Docker is installed and running on your system.
 - **Docker Compose**: Required for orchestrating multi-container Docker applications.
 - **Node.js and NPM**: For building the React frontend.
-- **Python 3.9**: Necessary for running scripts outside Docker, if needed.
+- **Python 3.9**: Necessary for running test scripts outside Docker, if needed.
 
-**Note for Markers:** Please make sure you have docker compose 2.10+ installed. Python is not nessecary for testing purposes, but you if you want to run scripts standalone, you need to have it installed.
+**Note for Markers:** Please make sure you have docker compose 2.10+ installed. Python is nessecary for testing purposes, but not for the main application. A standalone python image is used in the docker containers.
 
 ---
 
@@ -154,7 +155,7 @@ docker compose -f "<client>.yml" up --build
 - This will attempt to connect to your server on it's defined client websocket port. If successful, the client will be registered and will be provided a fingerprint.
 - You can now access your client's messaging interface at `<client_address>:<client_port>` and begin messaging other people! Any registered client known to your neighborhood will be visible in the recipients section.
 
-Move on to ## Usage
+Move on to [Usage](#usage)
 
 ### I. Testing
 
@@ -319,3 +320,44 @@ networks:
 | `LOG_MESSAGES`        | Enables (`True`) or disables (`False`) message logging for debugging.                                   | `True`           |
 | `CLIENT_NAME`         | Unique identifier for the client, used ONLY for local identification.                                   | `my_client`      |
 | `MESSAGE_EXPIRY_TIME` | Controls message retention: `-1` (never delete), `0` (always delete), `>0` (keep for specified seconds) | `-1`             |
+
+## Testing Protocol
+
+To ensure the correctness and reliability of the OMesh implementation, we have developed a comprehensive testing protocol. This protocol covers various aspects of the system, including cryptographic operations, message structure compliance, and end-to-end functionality.
+
+### Overview of Testing Protocol
+
+Our testing protocol is designed to verify:
+
+1. Cryptographic Function Testing: Ensures all cryptographic operations (key generation, encryption/decryption, digital signatures) are implemented correctly.
+2. Message Structure Compliance Testing: Verifies that all messages adhere to the protocol's data structures and field requirements.
+3. End-to-End Testing: Checks the overall functionality of the system in various scenarios.
+
+### Accessing the Testing Protocol
+
+For a detailed explanation of our testing methodology and specific test cases, please refer to our [Testing Protocol Document](tests/README.md). This document provides in-depth information on:
+
+- Test case descriptions and objectives
+- Step-by-step procedures for each test
+- Expected and actual results
+- Guidelines for interpreting test outcomes
+
+### Running the Tests
+
+To run the automated tests for OMesh:
+
+1. Ensure you have set up the nessecary requirements as described in the [Requirements](#requirements) section.
+2. Navigate to the project root directory.
+3. Run the testing script:
+
+```bash
+./run_tests.sh
+```
+
+### Interoperability Testing
+
+- TODO
+
+This script will execute all the test cases and provide a comprehensive report of the results.
+
+---
