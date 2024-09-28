@@ -6,13 +6,13 @@ services:
       dockerfile: ./client/Dockerfile
     container_name: olaf_client2
     ports:
-      - "5002:5000"
+      - "5001:5000"
     volumes:
       - config_client2:/app/client/config
       - chat_data_client2:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server2
-      - SERVER_PORT=8767
+      - SERVER_PORT=8765
       - HTTP_PORT=8082
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client1
