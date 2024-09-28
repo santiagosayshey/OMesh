@@ -54,7 +54,6 @@ from common.protocol import (
 SERVER_ADDRESS = os.environ.get('SERVER_ADDRESS', 'server1')
 SERVER_PORT = int(os.environ.get('SERVER_PORT', 8765))
 CLIENT_WS_URI = f'ws://{SERVER_ADDRESS}:{SERVER_PORT}'
-PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'localhost')
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
 
 # Read MESSAGE_EXPIRY_TIME from environment variable
@@ -547,7 +546,7 @@ class Client:
             'server_address': client_instance.server_address,
             'server_port': client_instance.server_port,
             'http_port': client_instance.http_port,
-            'public_host': PUBLIC_HOST
+            'public_host': SERVER_ADDRESS
         })
 
     @app.route('/upload_file', methods=['POST'])
