@@ -358,6 +358,4 @@ To run the automated tests for OMesh:
 
 - TODO
 
-This script will execute all the test cases and provide a comprehensive report of the results.
-
----
+# End of README
