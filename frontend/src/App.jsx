@@ -57,6 +57,7 @@ function OlafChatClient() {
   const [publicHost, setPublicHost] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isTestMode, setIsTestMode] = useState("");
+  const [lastMessageCount, setLastMessageCount] = useState(0);
   const [alerts, setAlerts] = useState([]);
 
   const dropdownRef = useRef(null);
@@ -149,10 +150,11 @@ function OlafChatClient() {
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagePaneRef.current) {
+    if (messagePaneRef.current && storedMessages.length > lastMessageCount) {
       messagePaneRef.current.scrollTop = messagePaneRef.current.scrollHeight;
+      setLastMessageCount(storedMessages.length);
     }
-  }, [storedMessages]);
+  }, [storedMessages, lastMessageCount]);
 
   // Set up automatic refresh for messages every 5 seconds
   useEffect(() => {
@@ -490,17 +492,16 @@ function OlafChatClient() {
               </a>
             </p>
           </div>
+          {/* Display selected recipients */}
+          <div className="mb-4">
+            <strong>Chatting with:</strong> {selectedRecipients.join(", ")}
+          </div>
 
           {/* Message pane */}
           <div
             className="h-192 overflow-y-auto bg-gray-200 p-4 rounded-lg dark:bg-gray-800 message-pane"
             ref={messagePaneRef}
           >
-            {/* Display selected recipients */}
-            <div className="mb-4">
-              <strong>Chatting with:</strong> {selectedRecipients.join(", ")}
-            </div>
-
             {sortedMessages.map((message, index) => {
               const isOwnMessage = message.sender === userFingerprint;
               const isFileMessage = message.message.startsWith("[File]");
