@@ -116,7 +116,7 @@ This script will:
 
 Create a docker compose file for a server setup. Make sure to include all the nessecary addresses, ports, and environment variables.
 
-**Note:** 2 server compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
+**Note:** Two server compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
 
 4. Deploy a Server Container
 
@@ -141,7 +141,7 @@ This will build and serve the server instance using the provided details in your
 
 Similar to the server compose file, create a new docker compose file for a client. Make sure to include all the nessecary addresses, the **client** websocket port defined in your server, and all environment variables.
 
-**Note:** 2 client compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
+**Note:** Three client compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
 
 6. Deploy a Client Container
 
@@ -157,7 +157,7 @@ docker compose -f "<client>.yml" up --build
 
 Move on to [Usage](#usage)
 
-### I. Testing
+### II. Testing
 
 To make marking easier, a bash script and complete docker compose file has been provided for you.
 
