@@ -6,6 +6,7 @@ import websockets
 from aiohttp import web
 import base64
 import os
+import time
 
 import logging
 
@@ -42,6 +43,7 @@ CLIENT_WS_PORT = int(os.environ.get('CLIENT_WS_PORT', 8765))           # Client 
 SERVER_WS_PORT = int(os.environ.get('SERVER_WS_PORT', 8766))           # Server WS port
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
 EXTERNAL_ADDRESS = os.environ.get('EXTERNAL_ADDRESS', BIND_ADDRESS)    # Public address/hostname
+TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'     # Enable test mode if set to 'True'
 
 # Parse NEIGHBOUR_ADDRESSES environment variable
 neighbour_addresses_env = os.environ.get('NEIGHBOUR_ADDRESSES', '')
@@ -59,6 +61,7 @@ CLIENTS_DIR = 'clients'
 FILES_DIR = 'files'
 CONFIG_DIR = 'config'
 NEIGHBOURS_DIR = 'neighbours'
+TEST_NEIGHBOURS_DIR = 'test_neighbours'  # Shared directory for test mode
 
 class Server:
     def __init__(self, bind_address, client_ws_port, server_ws_port, http_port, neighbours):
@@ -68,7 +71,7 @@ class Server:
         self.http_port = http_port
         self.neighbour_addresses = neighbours  # List of (address, port) tuples
 
-        self.external_address = os.environ.get('EXTERNAL_ADDRESS', self.bind_address)
+        self.external_address = EXTERNAL_ADDRESS
 
         # Client-related data structures
         self.clients = {}  # {fingerprint: websocket}
@@ -125,28 +128,57 @@ class Server:
     def load_neighbour_public_keys(self):
         """
         Loads the public keys of neighbour servers from files.
-        The files should be stored in 'neighbours' directory.
+        The files should be stored in 'neighbours' or 'test_neighbours' directory.
+        Retries loading keys if not found immediately.
         """
         neighbour_public_keys = {}
-        neighbours_dir = NEIGHBOURS_DIR
+        neighbours_dir = TEST_NEIGHBOURS_DIR if TEST_MODE else NEIGHBOURS_DIR
         os.makedirs(neighbours_dir, exist_ok=True)  # Ensure the directory exists
 
-        for address, port in self.neighbour_addresses:
-            key_filename = f'{address}_{port}_public_key.pem'
-            key_filepath = os.path.join(neighbours_dir, key_filename)
-            if os.path.exists(key_filepath):
-                with open(key_filepath, 'rb') as f:
-                    public_pem = f.read()
-                public_key = load_public_key(public_pem)
-                neighbour_public_keys[(address, port)] = public_key
-                logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
+        max_retries = 5
+        retry_delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            all_keys_loaded = True
+            for address, port in self.neighbour_addresses:
+                if (address, port) in neighbour_public_keys:
+                    continue  # Already loaded
+
+                key_filename = f'{address}_{port}_public_key.pem'
+                key_filepath = os.path.join(neighbours_dir, key_filename)
+                if os.path.exists(key_filepath):
+                    with open(key_filepath, 'rb') as f:
+                        public_pem = f.read()
+                    public_key = load_public_key(public_pem)
+                    neighbour_public_keys[(address, port)] = public_key
+                    logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
+                else:
+                    logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}. Retrying...")
+                    all_keys_loaded = False
+
+            if all_keys_loaded:
+                break
             else:
-                logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}. Please make sure you have added this key on the /upload_key page and restart your server.")
+                time.sleep(retry_delay)
+
+        self.neighbour_public_keys = neighbour_public_keys
         return neighbour_public_keys
+
 
     async def start(self):
         # Introduce a delay to allow other servers to write their public keys
         await asyncio.sleep(5)  # Wait for 5 seconds (adjust as needed)
+
+        # If TEST_MODE is True, save own public key to shared test_neighbours directory
+        if TEST_MODE:
+            test_neighbours_dir = TEST_NEIGHBOURS_DIR
+            os.makedirs(test_neighbours_dir, exist_ok=True)
+            key_filename = f"{self.external_address}_{self.server_ws_port}_public_key.pem"
+            key_filepath = os.path.join(test_neighbours_dir, key_filename)
+            public_pem = export_public_key(self.public_key)
+            with open(key_filepath, 'wb') as f:
+                f.write(public_pem)
+            logger.info(f"Saved own public key to test_neighbours directory as {key_filename}.")
 
         # Now load neighbor public keys
         self.neighbour_public_keys = self.load_neighbour_public_keys()
@@ -191,6 +223,7 @@ class Server:
         # Wait forever
         await asyncio.Future()
 
+
     async def connect_to_neighbours(self):
         await asyncio.sleep(1)  # Wait to ensure servers are up
         for address, port in self.neighbour_addresses:
@@ -220,18 +253,24 @@ class Server:
     def get_neighbour_public_key(self, sender_address):
         """
         Retrieves the public key of a neighbour server based on the sender's address.
-        If not found in memory, attempts to load it from the 'neighbours' directory.
+        If not found in memory, attempts to load it from the appropriate directory.
         """
         # Check if the public key is already loaded
         for (address, port), public_key in self.neighbour_public_keys.items():
             if sender_address == address or sender_address == f"{address}:{port}":
                 return public_key
 
-        # Attempt to load the public key from the 'neighbours' directory
+        # Determine the directory based on TEST_MODE
+        if TEST_MODE:
+            neighbours_dir = TEST_NEIGHBOURS_DIR
+        else:
+            neighbours_dir = NEIGHBOURS_DIR
+
+        # Attempt to load the public key from the appropriate directory
         for address, port in self.neighbour_addresses:
             if sender_address == address or sender_address == f"{address}:{port}":
                 key_filename = f'{address}_{port}_public_key.pem'
-                key_filepath = os.path.join(NEIGHBOURS_DIR, key_filename)
+                key_filepath = os.path.join(neighbours_dir, key_filename)
                 if os.path.exists(key_filepath):
                     with open(key_filepath, 'rb') as f:
                         public_pem = f.read()
@@ -243,6 +282,7 @@ class Server:
                     logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}.")
                     return None
         return None
+
 
     async def handle_client_connection(self, websocket, path):
         client_ip, client_port = websocket.remote_address

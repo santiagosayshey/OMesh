@@ -14,7 +14,8 @@ function OlafChatClient() {
   const [messageText, setMessageText] = useState("");
   const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
   const [publicHost, setPublicHost] = useState("");
-  const [isDarkMode, setIsDarkMode] = useState(true); // Added for dark mode
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isTestMode, setIsTestMode] = useState("");
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -44,6 +45,7 @@ function OlafChatClient() {
         setServerPort(data.server_port);
         setHttpPort(data.http_port);
         setPublicHost(data.public_host);
+        setIsTestMode(data.test_mode);
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
@@ -446,17 +448,20 @@ function OlafChatClient() {
               <strong>Fingerprint:</strong> {userFingerprint}
             </p>
             <p>
-              <strong>Connected to:</strong> {serverAddress}:{serverPort}
+              <strong>Connected to:</strong>{" "}
+              {isTestMode ? "localhost" : serverAddress}:{serverPort}
             </p>
             <p>
               <strong>File Server:</strong>{" "}
               <a
-                href={`http://${publicHost}:${httpPort}/files`}
+                href={`http://${
+                  isTestMode ? "localhost" : publicHost
+                }:${httpPort}/files`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
               >
-                http://{publicHost}:{httpPort}/files
+                http://{isTestMode ? "localhost" : publicHost}:{httpPort}/files
               </a>
             </p>
           </div>

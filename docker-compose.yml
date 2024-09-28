@@ -5,75 +5,90 @@ services:
       context: .
       dockerfile: ./server/Dockerfile
     container_name: olaf_server1
+    hostname: server1
     ports:
-      - "8765:8765" # WebSocket port for clients
-      - "8766:8766" # WebSocket port for servers
-      - "8081:8081" # HTTP port for file transfers
+      - "8765:8765"
+      - "8766:8766"
+      - "8081:8081"
     volumes:
-      - clients1:/app/server/clients
-      - files1:/app/server/files
-      - config1:/app/server/config
-      - neighbours:/app/server/neighbours
+      - test_clients1:/app/server/clients
+      - test_files1:/app/server/files
+      - test_config1:/app/server/config
+      - test_neighbours1:/app/server/neighbours
+      - test_neighbours_shared:/app/server/test_neighbours
     environment:
-      - SERVER_ADDRESS=server1
-      - SERVER_PORT=8765
-      - SERVER_SERVER_PORT=8766
+      - BIND_ADDRESS=0.0.0.0
+      - CLIENT_WS_PORT=8765
+      - SERVER_WS_PORT=8766
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server2:8766,server3:8766
       - LOG_MESSAGES=True
-      - PUBLIC_HOST=localhost
+      - EXTERNAL_ADDRESS=server1
+      - TEST_MODE=True
     networks:
-      - olaf_network
+      olaf_network:
+        aliases:
+          - server1
 
   server2:
     build:
       context: .
       dockerfile: ./server/Dockerfile
     container_name: olaf_server2
+    hostname: server2
     ports:
-      - "8767:8765" # WebSocket port for clients
-      - "8768:8766" # WebSocket port for servers
-      - "8082:8081" # HTTP port for file transfers
+      - "8767:8765"
+      - "8768:8766"
+      - "8082:8081"
     volumes:
-      - clients2:/app/server/clients
-      - files2:/app/server/files
-      - config2:/app/server/config
-      - neighbours:/app/server/neighbours
+      - test_clients2:/app/server/clients
+      - test_files2:/app/server/files
+      - test_config2:/app/server/config
+      - test_neighbours2:/app/server/neighbours
+      - test_neighbours_shared:/app/server/test_neighbours
     environment:
-      - SERVER_ADDRESS=server2
-      - SERVER_PORT=8765
-      - SERVER_SERVER_PORT=8766
+      - BIND_ADDRESS=0.0.0.0
+      - CLIENT_WS_PORT=8765
+      - SERVER_WS_PORT=8766
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server1:8766,server3:8766
       - LOG_MESSAGES=True
-      - PUBLIC_HOST=localhost
+      - EXTERNAL_ADDRESS=server2
+      - TEST_MODE=True
     networks:
-      - olaf_network
+      olaf_network:
+        aliases:
+          - server2
 
   server3:
     build:
       context: .
       dockerfile: ./server/Dockerfile
     container_name: olaf_server3
+    hostname: server3
     ports:
-      - "8769:8765" # WebSocket port for clients
-      - "8770:8766" # WebSocket port for servers
-      - "8083:8081" # HTTP port for file transfers
+      - "8769:8765"
+      - "8770:8766"
+      - "8083:8081"
     volumes:
-      - clients3:/app/server/clients
-      - files3:/app/server/files
-      - config3:/app/server/config
-      - neighbours:/app/server/neighbours
+      - test_clients3:/app/server/clients
+      - test_files3:/app/server/files
+      - test_config3:/app/server/config
+      - test_neighbours3:/app/server/neighbours
+      - test_neighbours_shared:/app/server/test_neighbours
     environment:
-      - SERVER_ADDRESS=server3
-      - SERVER_PORT=8765
-      - SERVER_SERVER_PORT=8766
+      - BIND_ADDRESS=0.0.0.0
+      - CLIENT_WS_PORT=8765
+      - SERVER_WS_PORT=8766
       - HTTP_PORT=8081
       - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766
       - LOG_MESSAGES=True
-      - PUBLIC_HOST=localhost
+      - EXTERNAL_ADDRESS=server3
+      - TEST_MODE=True
     networks:
-      - olaf_network
+      olaf_network:
+        aliases:
+          - server3
 
   client1:
     build:
@@ -83,18 +98,20 @@ services:
     ports:
       - "5001:5000"
     volumes:
-      - config_client1:/app/client/config
-      - chat_data_client1:/app/client/chat_data
+      - test_config_client1:/app/client/config
+      - test_chat_data_client1:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
+      - HTTP_PORT=8081
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client1
       - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
+      - TEST_MODE=True
     depends_on:
       - server1
+    networks:
+      - olaf_network
 
   client2:
     build:
@@ -104,18 +121,20 @@ services:
     ports:
       - "5002:5000"
     volumes:
-      - config_client2:/app/client/config
-      - chat_data_client2:/app/client/chat_data
+      - test_config_client2:/app/client/config
+      - test_chat_data_client2:/app/client/chat_data
     environment:
-      - SERVER_ADDRESS=server1
-      - SERVER_PORT=8765
+      - SERVER_ADDRESS=server2
+      - SERVER_PORT=8766
+      - HTTP_PORT=8082
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client2
       - MESSAGE_EXPIRY_TIME=-1
+      - TEST_MODE=True
+    depends_on:
+      - server2
     networks:
       - olaf_network
-    depends_on:
-      - server1
 
   client3:
     build:
@@ -125,61 +144,41 @@ services:
     ports:
       - "5003:5000"
     volumes:
-      - config_client3:/app/client/config
-      - chat_data_client3:/app/client/chat_data
+      - test_config_client3:/app/client/config
+      - test_chat_data_client3:/app/client/chat_data
     environment:
-      - SERVER_ADDRESS=server2
-      - SERVER_PORT=8765
+      - SERVER_ADDRESS=server3
+      - SERVER_PORT=8767
+      - HTTP_PORT=8083
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client3
       - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
-    depends_on:
-      - server2
-
-  client4:
-    build:
-      context: .
-      dockerfile: ./client/Dockerfile
-    container_name: olaf_client4
-    ports:
-      - "5004:5000"
-    volumes:
-      - config_client4:/app/client/config
-      - chat_data_client4:/app/client/chat_data
-    environment:
-      - SERVER_ADDRESS=server3
-      - SERVER_PORT=8765
-      - LOG_MESSAGES=True
-      - CLIENT_NAME=Client4
-      - MESSAGE_EXPIRY_TIME=-1
-    networks:
-      - olaf_network
+      - TEST_MODE=True
     depends_on:
       - server3
+    networks:
+      - olaf_network
 
 volumes:
-  # Server volumes
-  clients1:
-  clients2:
-  clients3:
-  files1:
-  files2:
-  files3:
-  config1:
-  config2:
-  config3:
-  neighbours:
-  # Client volumes
-  config_client1:
-  config_client2:
-  config_client3:
-  config_client4:
-  chat_data_client1:
-  chat_data_client2:
-  chat_data_client3:
-  chat_data_client4:
+  test_clients1:
+  test_files1:
+  test_config1:
+  test_neighbours1:
+  test_clients2:
+  test_files2:
+  test_config2:
+  test_neighbours2:
+  test_clients3:
+  test_files3:
+  test_config3:
+  test_neighbours3:
+  test_config_client1:
+  test_chat_data_client1:
+  test_config_client2:
+  test_chat_data_client2:
+  test_config_client3:
+  test_chat_data_client3:
+  test_neighbours_shared:
 
 networks:
   olaf_network:

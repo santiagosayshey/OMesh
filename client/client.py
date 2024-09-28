@@ -52,6 +52,9 @@ from common.protocol import (
 
 # Configuration
 SERVER_ADDRESS = os.environ.get('SERVER_ADDRESS', 'server1')
+# Read TEST_MODE environment variable
+TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
+
 SERVER_PORT = int(os.environ.get('SERVER_PORT', 8765))
 CLIENT_WS_URI = f'ws://{SERVER_ADDRESS}:{SERVER_PORT}'
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
@@ -546,7 +549,8 @@ class Client:
             'server_address': client_instance.server_address,
             'server_port': client_instance.server_port,
             'http_port': client_instance.http_port,
-            'public_host': SERVER_ADDRESS
+            'public_host': SERVER_ADDRESS,
+            'test_mode': TEST_MODE
         })
 
     @app.route('/upload_file', methods=['POST'])
