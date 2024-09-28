@@ -6,6 +6,7 @@ import websockets
 from aiohttp import web
 import base64
 import os
+import time
 
 import logging
 
@@ -37,11 +38,12 @@ from common.crypto import (
 )
 
 # Read environment variables
-SERVER_ADDRESS = os.environ.get('SERVER_ADDRESS', '0.0.0.0')
-SERVER_PORT = int(os.environ.get('SERVER_PORT', 8765))           # Client WS port
-SERVER_SERVER_PORT = int(os.environ.get('SERVER_SERVER_PORT', 8766)) # Server WS port
+BIND_ADDRESS = os.environ.get('BIND_ADDRESS', '0.0.0.0')
+CLIENT_WS_PORT = int(os.environ.get('CLIENT_WS_PORT', 8765))           # Client WS port
+SERVER_WS_PORT = int(os.environ.get('SERVER_WS_PORT', 8766))           # Server WS port
 HTTP_PORT = int(os.environ.get('HTTP_PORT', 8081))
-PUBLIC_HOST = os.environ.get('PUBLIC_HOST', 'localhost')
+EXTERNAL_ADDRESS = os.environ.get('EXTERNAL_ADDRESS', BIND_ADDRESS)    # Public address/hostname
+TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'     # Enable test mode if set to 'True'
 
 # Parse NEIGHBOUR_ADDRESSES environment variable
 neighbour_addresses_env = os.environ.get('NEIGHBOUR_ADDRESSES', '')
@@ -52,21 +54,24 @@ if neighbour_addresses_env:
             host, port = addr.split(':')
             NEIGHBOUR_ADDRESSES.append((host.strip(), int(port.strip())))
         else:
-            NEIGHBOUR_ADDRESSES.append((addr.strip(), SERVER_SERVER_PORT))  # Default to SERVER_SERVER_PORT if port not specified
+            NEIGHBOUR_ADDRESSES.append((addr.strip(), SERVER_WS_PORT))  # Default to SERVER_WS_PORT if port not specified
 
 # Paths for storing client public keys and uploaded files
 CLIENTS_DIR = 'clients'
 FILES_DIR = 'files'
 CONFIG_DIR = 'config'
 NEIGHBOURS_DIR = 'neighbours'
+TEST_NEIGHBOURS_DIR = 'test_neighbours'  # Shared directory for test mode
 
 class Server:
-    def __init__(self, address, client_ws_port, server_ws_port, http_port, neighbours):
-        self.address = address
+    def __init__(self, bind_address, client_ws_port, server_ws_port, http_port, neighbours):
+        self.bind_address = bind_address
         self.client_ws_port = client_ws_port
         self.server_ws_port = server_ws_port
         self.http_port = http_port
         self.neighbour_addresses = neighbours  # List of (address, port) tuples
+
+        self.external_address = EXTERNAL_ADDRESS
 
         # Client-related data structures
         self.clients = {}  # {fingerprint: websocket}
@@ -127,23 +132,40 @@ class Server:
     def load_neighbour_public_keys(self):
         """
         Loads the public keys of neighbour servers from files.
-        The files should be stored in 'neighbours' directory.
+        The files should be stored in 'neighbours' or 'test_neighbours' directory.
+        Retries loading keys if not found immediately.
         """
         neighbour_public_keys = {}
-        neighbours_dir = NEIGHBOURS_DIR
+        neighbours_dir = TEST_NEIGHBOURS_DIR if TEST_MODE else NEIGHBOURS_DIR
         os.makedirs(neighbours_dir, exist_ok=True)  # Ensure the directory exists
 
-        for address, port in self.neighbour_addresses:
-            key_filename = f'{address}_{port}_public_key.pem'
-            key_filepath = os.path.join(neighbours_dir, key_filename)
-            if os.path.exists(key_filepath):
-                with open(key_filepath, 'rb') as f:
-                    public_pem = f.read()
-                public_key = load_public_key(public_pem)
-                neighbour_public_keys[(address, port)] = public_key
-                logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
+        max_retries = 5
+        retry_delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            all_keys_loaded = True
+            for address, port in self.neighbour_addresses:
+                if (address, port) in neighbour_public_keys:
+                    continue  # Already loaded
+
+                key_filename = f'{address}_{port}_public_key.pem'
+                key_filepath = os.path.join(neighbours_dir, key_filename)
+                if os.path.exists(key_filepath):
+                    with open(key_filepath, 'rb') as f:
+                        public_pem = f.read()
+                    public_key = load_public_key(public_pem)
+                    neighbour_public_keys[(address, port)] = public_key
+                    logger.info(f"Loaded public key for neighbour {address}:{port} from file.")
+                else:
+                    logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}. Retrying...")
+                    all_keys_loaded = False
+
+            if all_keys_loaded:
+                break
             else:
-                logger.warning(f"Public key for neighbour {address}:{port} not found at {key_filepath}. Please make sure you have added this key on the /upload_key page and restart your server.")
+                time.sleep(retry_delay)
+
+        self.neighbour_public_keys = neighbour_public_keys
         return neighbour_public_keys
 
     def load_maintenance_mode(self):
@@ -168,20 +190,31 @@ class Server:
         # Introduce a delay to allow other servers to write their public keys
         await asyncio.sleep(5)  # Wait for 5 seconds (adjust as needed)
 
+        # If TEST_MODE is True, save own public key to shared test_neighbours directory
+        if TEST_MODE:
+            test_neighbours_dir = TEST_NEIGHBOURS_DIR
+            os.makedirs(test_neighbours_dir, exist_ok=True)
+            key_filename = f"{self.external_address}_{self.server_ws_port}_public_key.pem"
+            key_filepath = os.path.join(test_neighbours_dir, key_filename)
+            public_pem = export_public_key(self.public_key)
+            with open(key_filepath, 'wb') as f:
+                f.write(public_pem)
+            logger.info(f"Saved own public key to test_neighbours directory as {key_filename}.")
+
         # Now load neighbor public keys
         self.neighbour_public_keys = self.load_neighbour_public_keys()
 
         # Start WebSocket server for clients
         client_server = await websockets.serve(
-            self.handle_client_connection, self.address, self.client_ws_port, ping_interval=5
+            self.handle_client_connection, self.bind_address, self.client_ws_port, ping_interval=5
         )
-        logger.info(f"WebSocket server for clients listening on {self.address}:{self.client_ws_port}")
+        logger.info(f"WebSocket server for clients listening on {self.bind_address}:{self.client_ws_port}")
 
         # Start WebSocket server for other servers
         server_server = await websockets.serve(
-            self.handle_server_connection, self.address, self.server_ws_port
+            self.handle_server_connection, self.bind_address, self.server_ws_port
         )
-        logger.info(f"WebSocket server for servers listening on {self.address}:{self.server_ws_port}")
+        logger.info(f"WebSocket server for servers listening on {self.bind_address}:{self.server_ws_port}")
 
         # Start HTTP server for file transfers and endpoints
         app = web.Application()
@@ -211,6 +244,7 @@ class Server:
         # Wait forever
         await asyncio.Future()
 
+
     async def connect_to_neighbours(self):
         await asyncio.sleep(1)  # Wait to ensure servers are up
         for address, port in self.neighbour_addresses:
@@ -223,7 +257,7 @@ class Server:
 
                 # Send 'server_hello' with signature and counter
                 self.counter += 1  # Increment server's own counter
-                server_hello_message = build_server_hello(self.address, self.private_key, self.counter)
+                server_hello_message = build_server_hello(self.external_address, self.private_key, self.counter)
                 server_hello_json = json.dumps(server_hello_message)
                 await websocket.send(server_hello_json)
 
@@ -240,18 +274,24 @@ class Server:
     def get_neighbour_public_key(self, sender_address):
         """
         Retrieves the public key of a neighbour server based on the sender's address.
-        If not found in memory, attempts to load it from the 'neighbours' directory.
+        If not found in memory, attempts to load it from the appropriate directory.
         """
         # Check if the public key is already loaded
         for (address, port), public_key in self.neighbour_public_keys.items():
             if sender_address == address or sender_address == f"{address}:{port}":
                 return public_key
 
-        # Attempt to load the public key from the 'neighbours' directory
+        # Determine the directory based on TEST_MODE
+        if TEST_MODE:
+            neighbours_dir = TEST_NEIGHBOURS_DIR
+        else:
+            neighbours_dir = NEIGHBOURS_DIR
+
+        # Attempt to load the public key from the appropriate directory
         for address, port in self.neighbour_addresses:
             if sender_address == address or sender_address == f"{address}:{port}":
                 key_filename = f'{address}_{port}_public_key.pem'
-                key_filepath = os.path.join(NEIGHBOURS_DIR, key_filename)
+                key_filepath = os.path.join(neighbours_dir, key_filename)
                 if os.path.exists(key_filepath):
                     with open(key_filepath, 'rb') as f:
                         public_pem = f.read()
@@ -293,7 +333,7 @@ class Server:
                         self.clients[fingerprint] = websocket
                         self.client_public_keys[fingerprint] = public_key
                         self.client_counters[fingerprint] = 0  # Initialize counter
-                        self.fingerprint_to_server[fingerprint] = self.address  # Associate client with this server
+                        self.fingerprint_to_server[fingerprint] = self.external_address  # Associate client with this server
                         logger.info(f"Registered new client with fingerprint: {fingerprint} from {client_ip}:{client_port}")
 
                         # Broadcast the updated client list to other servers
@@ -381,7 +421,7 @@ class Server:
         clients_public_keys = [
             self.client_public_keys[fingerprint]
             for fingerprint, server_address in self.fingerprint_to_server.items()
-            if server_address == self.address
+            if server_address == self.external_address
         ]
         client_update_message = build_client_update(clients_public_keys)
         message_json = json.dumps(client_update_message)
@@ -395,7 +435,6 @@ class Server:
                 logger.info(f"Sent client update to server {server_address}.")
             except Exception as e:
                 logger.error(f"Error sending client update to server {server_address}: {e}")
-
 
     async def handle_client_message(self, websocket, message_dict, client_fingerprint):
         if self.maintenance_mode:
@@ -604,7 +643,6 @@ class Server:
                 await websocket.close()
                 return
 
-
     async def forward_message(self, message_dict):
         data = message_dict.get('data', {})
         message_type = data.get('type')
@@ -613,12 +651,12 @@ class Server:
             destination_servers = data.get('destination_servers', [])
 
             # Deliver to clients on this server if it's a destination
-            if self.address in destination_servers:
+            if self.external_address in destination_servers:
                 await self.deliver_message_to_clients(message_dict)
 
             # Forward to other servers, but only the part they need
             for server_address in destination_servers:
-                if server_address != self.address and server_address in self.servers:
+                if server_address != self.external_address and server_address in self.servers:
                     websocket = self.servers[server_address]
                     try:
                         # Create a new message with only this server as destination
@@ -707,7 +745,7 @@ class Server:
             # Forward to all other servers
             message_json = json.dumps(message_dict)
             for server_address, websocket in self.servers.items():
-                if server_address != self.address:
+                if server_address != self.external_address:
                     try:
                         await websocket.send(message_json)
                         logger.info(f"Forwarded public chat to server {server_address}.")
@@ -740,7 +778,7 @@ class Server:
                     return web.json_response({'error': 'File size exceeds limit'}, status=413)
                 f.write(chunk)
 
-        file_url = f"http://{PUBLIC_HOST}:{self.http_port}/files/{filename}"
+        file_url = f"http://{self.external_address}:{self.http_port}/files/{filename}"
         return web.json_response({'file_url': file_url})
 
     async def handle_file_download(self, request):
@@ -780,25 +818,6 @@ class Server:
         """
         public_pem = export_public_key(self.public_key).decode('utf-8')
         return web.Response(text=public_pem, content_type='text/plain')
-
-    async def handle_upload_key_page(self, request):
-        """
-        Serves an HTML page with a form to upload a public key file.
-        """
-        html = '''
-        <html>
-        <body>
-            <h1>Upload Public Key</h1>
-            <form action="/upload_key" method="post" enctype="multipart/form-data">
-                Address: <input type="text" name="address" required><br>
-                Port: <input type="text" name="port" required><br>
-                Public Key File: <input type="file" name="file" accept=".pem" required><br>
-                <input type="submit" value="Upload">
-            </form>
-        </body>
-        </html>
-        '''
-        return web.Response(text=html, content_type='text/html')
 
     async def handle_upload_key(self, request):
         """
@@ -844,6 +863,25 @@ class Server:
 
         return web.Response(text=f"Public key for {address}:{port} uploaded successfully.", status=200)
 
+    async def handle_upload_key_page(self, request):
+        """
+        Serves an HTML page with a form to upload a public key file.
+        """
+        html = '''
+        <html>
+        <body>
+            <h1>Upload Public Key</h1>
+            <form action="/upload_key" method="post" enctype="multipart/form-data">
+                Address: <input type="text" name="address" required><br>
+                Port: <input type="text" name="port" required><br>
+                Public Key File: <input type="file" name="file" accept=".pem" required><br>
+                <input type="submit" value="Upload">
+            </form>
+        </body>
+        </html>
+        '''
+        return web.Response(text=html, content_type='text/html')
+
 def log_message(direction, message):
     if direction == "Received":
         try:
@@ -862,14 +900,14 @@ if __name__ == '__main__':
     import sys
 
     # Read server configuration from environment variables
-    address = SERVER_ADDRESS
-    client_ws_port = SERVER_PORT
-    server_ws_port = SERVER_SERVER_PORT
+    bind_address = BIND_ADDRESS
+    client_ws_port = CLIENT_WS_PORT
+    server_ws_port = SERVER_WS_PORT
     http_port = HTTP_PORT
     neighbours = NEIGHBOUR_ADDRESSES
 
     # Create Server instance with correct parameters
-    server = Server(address, client_ws_port, server_ws_port, http_port, neighbours)
+    server = Server(bind_address, client_ws_port, server_ws_port, http_port, neighbours)
     try:
         asyncio.run(server.start())
     except KeyboardInterrupt:

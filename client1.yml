@@ -11,11 +11,11 @@ services:
       - config_client1:/app/client/config
       - chat_data_client1:/app/client/chat_data
     environment:
-      - SERVER_ADDRESS=server1
+      - SERVER_ADDRESS=65.108.216.173
       - SERVER_PORT=8765
       - HTTP_PORT=8081
       - LOG_MESSAGES=True
-      - CLIENT_NAME=Client1
+      - CLIENT_NAME=sam_remote
       - MESSAGE_EXPIRY_TIME=-1
     networks:
       - olaf_network
