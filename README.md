@@ -129,9 +129,12 @@ This will build and serve the server instance using the provided details in your
 
 - If this is the first time that the server runs, it will generate and save it's public key inside it's config volume. This public key can be found by navigating to `<server_address>:<http_port>/pub`
 - To add a server to your neighborhood, you must:
-  i. Define the address+port of the remote server inside the `NEIGHBOUR_ADRESSES` field inside your compose file
-  ii. Upload the server's public key at `<server_address>:<http_port>/upload_key`. Make sure that the pub key is named `<server_address>_<server_websocket_port>_public_key.pem`
-  iii. Restart the server. If you have done it correctly, your server will attempt to send a hello to every server identified. It will retry up to 5 times before failing.
+  1. Define the address+port of the remote server inside the `NEIGHBOUR_ADRESSES` field inside your compose file
+  2. Upload the server's public key at `<server_address>:<http_port>/upload_key`
+     - Make sure that the pub key is named `<server_address>_<server_websocket_port>_public_key.pem`
+  3. Restart the server
+     - If you have done it correctly, your server will attempt to send a hello to every server identified
+     - It will retry up to 5 times before failing
 
 5. Build a Client Container
 
