@@ -15,7 +15,7 @@ services:
       - config1:/app/server/config
       - neighbours:/app/server/neighbours
     environment:
-      - SERVER_ADDRESS=0.0.0.0
+      - SERVER_ADDRESS=server1
       - SERVER_PORT=8765
       - SERVER_SERVER_PORT=8766
       - HTTP_PORT=8081
