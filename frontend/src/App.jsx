@@ -1,6 +1,46 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ToastContainer, toast, cssTransition } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+
+// Alert Component
+const Alert = ({ id, message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose(id);
+    }, 3000); // Auto-dismiss after 3 seconds
+
+    return () => clearTimeout(timer);
+  }, [id, onClose]);
+
+  return (
+    <div
+      className="max-w-sm w-full bg-green-600 text-white px-4 py-3 rounded shadow-lg flex items-center justify-between animate-fade-in-down"
+      role="alert"
+    >
+      <span className="font-medium">{message}</span>
+      <button
+        onClick={() => onClose(id)}
+        className="ml-4 text-lg font-bold focus:outline-none"
+      >
+        &times;
+      </button>
+      {/* Progress Bar */}
+      <div
+        className="absolute bottom-0 left-0 h-1 bg-white transition-all duration-300"
+        style={{ animation: "progress 3s linear forwards" }}
+      ></div>
+    </div>
+  );
+};
+
+// AlertContainer Component
+const AlertContainer = ({ alerts, onClose }) => {
+  return (
+    <div className="fixed top-4 right-4 z-50 flex flex-col items-end space-y-2">
+      {alerts.map((alert) => (
+        <Alert key={alert.id} {...alert} onClose={onClose} />
+      ))}
+    </div>
+  );
+};
 
 function OlafChatClient() {
   const [userFingerprint, setUserFingerprint] = useState("");
@@ -16,6 +56,7 @@ function OlafChatClient() {
   const [publicHost, setPublicHost] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isTestMode, setIsTestMode] = useState("");
+  const [alerts, setAlerts] = useState([]);
 
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -34,6 +75,17 @@ function OlafChatClient() {
     localStorage.setItem("isDarkMode", isDarkMode);
   }, [isDarkMode]);
 
+  // Function to add an alert
+  const addAlert = (message) => {
+    const id = Date.now();
+    setAlerts((prevAlerts) => [...prevAlerts, { id, message }]);
+  };
+
+  // Function to remove an alert
+  const removeAlert = (id) => {
+    setAlerts((prevAlerts) => prevAlerts.filter((alert) => alert.id !== id));
+  };
+
   // Fetch user fingerprint, name, and server info on component mount
   useEffect(() => {
     fetch("/get_fingerprint")
@@ -49,7 +101,7 @@ function OlafChatClient() {
       })
       .catch((error) => {
         console.error("Error getting fingerprint:", error);
-        toast.error("Error getting user information.");
+        addAlert("Error getting user information.");
       });
   }, []);
 
@@ -72,7 +124,7 @@ function OlafChatClient() {
       })
       .catch((error) => {
         console.error("Error fetching clients:", error);
-        toast.error("Error fetching client list.");
+        addAlert("Error fetching client list.");
       });
   };
 
@@ -90,7 +142,7 @@ function OlafChatClient() {
       })
       .catch((error) => {
         console.error("Error refreshing messages:", error);
-        toast.error("Error refreshing messages.");
+        addAlert("Error refreshing messages.");
       });
   };
 
@@ -149,11 +201,12 @@ function OlafChatClient() {
   // Handle sending message
   const handleSendMessage = () => {
     if (messageText.trim() === "") {
+      addAlert("Please enter a message.");
       return;
     }
 
     if (selectedRecipients.length === 0) {
-      toast.error("Please select at least one recipient.");
+      addAlert("Please select at least one recipient.");
       return;
     }
 
@@ -175,12 +228,11 @@ function OlafChatClient() {
           console.log("Public message sent response:", data);
           // Fetch messages immediately after sending
           refreshMessages();
-          // Show success toast
-          toast.success("Public message sent successfully!");
+          addAlert("Public message sent successfully.");
         })
         .catch((error) => {
           console.error("Error sending public message:", error);
-          toast.error("Failed to send public message.");
+          addAlert("Failed to send public message.");
         });
     }
 
@@ -212,12 +264,11 @@ function OlafChatClient() {
           console.log("Private message sent response:", data);
           // Fetch messages immediately after sending
           refreshMessages();
-          // Show success toast
-          toast.success("Private message sent successfully!");
+          addAlert("Private message sent successfully.");
         })
         .catch((error) => {
           console.error("Error sending message:", error);
-          toast.error("Failed to send private message.");
+          addAlert("Failed to send private message.");
         });
     }
 
@@ -237,7 +288,7 @@ function OlafChatClient() {
     const file = event.target.files[0];
     if (file) {
       if (selectedRecipients.length === 0) {
-        toast.error("Please select at least one recipient.");
+        addAlert("Please select at least one recipient.");
         return;
       }
 
@@ -259,25 +310,24 @@ function OlafChatClient() {
             console.log("File upload response:", data);
             // Fetch messages immediately after sending
             refreshMessages();
-            // Show success toast
-            toast.success("File uploaded successfully!");
+            addAlert("File uploaded successfully.");
           } else {
             // Handle errors
             const errorData = await response.json();
             console.error("File upload error:", errorData);
-            toast.error(errorData.error || "File upload failed");
+            addAlert(errorData.error || "File upload failed.");
           }
           // Clear selected file after upload
           event.target.value = null;
         })
         .catch((error) => {
           console.error("Error uploading file:", error);
-          toast.error("Error uploading file");
+          addAlert("Error uploading file.");
         });
     }
   };
 
-  // Function to get file type icon
+  // Function to get file type icon (if needed elsewhere)
   const getFileTypeIcon = (fileUrl) => {
     const extension = fileUrl.split(".").pop().toLowerCase();
     switch (extension) {
@@ -371,40 +421,12 @@ function OlafChatClient() {
     (a, b) => a.timestamp - b.timestamp
   );
 
-  // Define custom toast classes
-  const toastClasses = {
-    container: `toast-container ${isDarkMode ? "dark" : "light"}`,
-    body: "toast-body",
-    progress: "toast-progress",
-  };
-
-  // Transition for toasts
-  const Slide = cssTransition({
-    enter: "slideIn",
-    exit: "slideOut",
-    duration: 300,
-  });
-
   return (
-    <div className={`${isDarkMode ? "dark" : ""}`}>
+    <div className={isDarkMode ? "dark" : ""}>
+      {/* Alert Container */}
+      <AlertContainer alerts={alerts} onClose={removeAlert} />
+
       <div className="bg-gray-100 text-gray-900 min-h-screen flex flex-col dark:bg-gray-900 dark:text-gray-100">
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          transition={Slide}
-          toastClassName={() =>
-            `relative flex p-3 min-h-10 rounded-md justify-between overflow-hidden cursor-pointer mb-2 bg-white text-gray-800 dark:bg-gray-800 dark:text-white`
-          }
-          bodyClassName={() => "text-sm flex items-center"}
-          progressClassName="bg-blue-500"
-        />
         <div className="container mx-auto px-4 py-8 flex flex-col flex-grow">
           {/* Header section */}
           <div className="flex justify-between items-center mb-4">
@@ -420,12 +442,12 @@ function OlafChatClient() {
                     onChange={() => setIsDarkMode(!isDarkMode)}
                   />
                   <div
-                    className={`block w-14 h-8 rounded-full ${
+                    className={`block w-14 h-8 rounded-full transition-colors duration-300 ${
                       isDarkMode ? "bg-blue-600" : "bg-gray-300"
                     }`}
                   ></div>
                   <div
-                    className={`dot absolute left-1 top-1 w-6 h-6 rounded-full transition ${
+                    className={`dot absolute left-1 top-1 w-6 h-6 rounded-full transition-transform duration-300 ${
                       isDarkMode
                         ? "transform translate-x-6 bg-white"
                         : "bg-white"
@@ -461,7 +483,9 @@ function OlafChatClient() {
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
               >
-                http://{isTestMode ? "localhost" : publicHost}:{httpPort}/files
+                {`http://${
+                  isTestMode ? "localhost" : publicHost
+                }:${httpPort}/files`}
               </a>
             </p>
           </div>
@@ -501,7 +525,7 @@ function OlafChatClient() {
                       isOwnMessage
                         ? "bg-green-600 text-white dark:bg-green-500"
                         : "bg-gray-300 text-gray-900 dark:bg-gray-700 dark:text-white"
-                    }`}
+                    } relative`}
                   >
                     <div className="flex items-center mb-1">
                       <strong className="mr-2 break-all">
