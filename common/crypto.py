@@ -12,7 +12,7 @@ import os
 # Constants
 RSA_KEY_SIZE = 2048
 RSA_PUBLIC_EXPONENT = 65537
-AES_KEY_SIZE = 32  # 256 bits
+AES_KEY_SIZE = 16  # 128 bits
 AES_IV_SIZE = 16   # 16 bytes
 PSS_SALT_LENGTH = 32  # bytes
 

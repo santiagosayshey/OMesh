@@ -125,7 +125,7 @@ services:
       - test_chat_data_client2:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server2
-      - SERVER_PORT=8766
+      - SERVER_PORT=8765
       - HTTP_PORT=8082
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client2
@@ -148,7 +148,7 @@ services:
       - test_chat_data_client3:/app/client/chat_data
     environment:
       - SERVER_ADDRESS=server3
-      - SERVER_PORT=8767
+      - SERVER_PORT=8765
       - HTTP_PORT=8083
       - LOG_MESSAGES=True
       - CLIENT_NAME=Client3

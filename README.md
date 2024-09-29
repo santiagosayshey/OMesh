@@ -4,10 +4,6 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 
 **Group Members:** Samuel Chau and Menno Brandt
 
-## Preview
-
-![Demo GIF](./.github/preview.png)
-
 ---
 
 ## Table of Contents
@@ -19,16 +15,18 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Usage](#usage)
-- [Docker Compose File Explanation](#docker-compose-file-explanation)
-- [Scripts Explanation](#scripts-explanation)
-- [Additional Notes](#additional-notes)
-- [Acknowledgements](#acknowledgements)
+- [Testing Protocol](#testing-protocol)
+- [Appendix](#appendix)
+  - [Docker Compose Setup](#docker-compose-setup-for-omesh)
+  - [Basic Docker Compose Commands](#basic-docker-compose-commands)
+  - [Server Configuration](#server)
+  - [Client Configuration](#client-environment-variables)
 
 ---
 
 ## General Description
 
-OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients. The protocol combines aspects of the original OLAF protocol with the Neighbourhood protocol to create a meshed network where servers are interconnected, and clients communicate through their home servers.
+OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients.
 
 This project demonstrates key features such as client-to-client messaging, server-to-server communication, end-to-end encryption, and file transfers, all encapsulated within Docker containers for ease of deployment and testing.
 
@@ -48,47 +46,27 @@ This project demonstrates key features such as client-to-client messaging, serve
 
 ---
 
-## Protocol Overview
+## Protocol Overview and Implementation
 
-### General Overview
+The OLAF's Neighbourhood protocol enables secure, decentralized communication:
 
-The OLAF's Neighbourhood protocol is designed to enable secure, encrypted communication between clients in a decentralized network. Key components include:
+- **Users**: Identified by RSA key pairs and derived fingerprints.
+- **Servers**: Relay messages between clients and other servers.
+- **Neighbourhood**: A meshed network of interconnected servers.
+- **Messages**: JSON-formatted, UTF-8 encoded.
 
-- **Users**: Identified by unique RSA key pairs and fingerprints derived from their public keys.
-- **Servers**: Act as relays, forwarding messages between clients and other servers.
-- **Neighbourhood**: A meshed network of servers where each server is aware of and connected to every other server.
-- **Messages**: JSON-formatted, UTF-8 encoded messages that follow a specific protocol for communication.
+Key features and implementation details:
 
-### Features
-
-- **Client Registration**: Clients send a `hello` message to their home server to establish their identity.
-- **End-to-End Encryption**: Messages are encrypted using RSA and AES encryption schemes.
-- **Client Discovery**: Clients can request a list of currently connected clients.
-- **Message Routing**: Servers forward messages to the appropriate destination servers.
-- **File Transfers**: Clients can upload and download files through HTTP APIs.
-- **Replay Attack Prevention**: Messages include counters and signatures to prevent replay attacks.
-
----
-
-## Implementation Details
-
-### How the Protocol Has Been Implemented
-
-- **WebSockets for Communication**: Both client-server and server-server communications are handled via WebSockets, enabling real-time data exchange.
-- **Asynchronous Programming**: Utilizes Python's `asyncio` library for non-blocking IO operations.
-- **RSA and AES Encryption**: Implements RSA for asymmetric encryption and signing, and AES-GCM for symmetric encryption.
-- **Dockerized Services**: All components are containerized, allowing for easy deployment and scaling.
-- **React Frontend with Vite**: Provides a user-friendly interface for clients to send messages and upload files, built using React and bundled with Vite for optimized performance.
-
-### Features Implemented
-
-- **Client Registration and Authentication**
-- **Secure Messaging with Encryption**
-- **Server Discovery and Neighbourhood Formation**
-- **Client List Retrieval**
-- **Public and Private Chat Messaging**
-- **File Upload and Download Functionality**
-- **Message Logging and Debugging Options**
+- **WebSocket Communication**: For real-time client-server and server-server data exchange.
+- **Neighbourboods**: Manually define neighbourhoods by sharing public keys.
+- **Server Connection**: Servers send a `hello_server` message to establish websocket connection.
+- **Client Registration**: Clients send a `hello` message to establish identity.
+- **End-to-End Encryption**: Uses RSA for asymmetric and AES-GCM for symmetric encryption.
+- **Asynchronous Programming**: Utilizes Python's `asyncio` for non-blocking operations.
+- **File Transfers**: Via HTTP APIs.
+- **Replay Attack Prevention**: Messages include counters and signatures.
+- **Dockerized Services**: For easy deployment and scaling.
+- **React Frontend**: User interface programmed in React served by Vite.
 
 ---
 
@@ -97,25 +75,35 @@ The OLAF's Neighbourhood protocol is designed to enable secure, encrypted commun
 - **Docker**: Ensure Docker is installed and running on your system.
 - **Docker Compose**: Required for orchestrating multi-container Docker applications.
 - **Node.js and NPM**: For building the React frontend.
-- **Python 3.9**: Necessary for running scripts outside Docker, if needed.
+- **Python 3.9**: Necessary for running test scripts outside Docker, if needed.
+
+**Note for Markers:** Please make sure you have docker compose 2.10+ installed. Python is nessecary for testing purposes, but not for the main application. A standalone python image is used in the docker containers.
 
 ---
 
 ## Setup
 
-### Cloning the Repository
+This section is split into two main parts: I. Production and II. Testing. If you want to use OMesh in a production environment, please follow the instructions noted there. **If you are marking this assignment, please follow the testing instructions instead.**
+
+**Note for Markers:** If you would like to test OMesh with your own implemenations, please follow the production steps to setup a custom server/client container. Otherwise, the testing setup will be sufficient to give feedback. If you have any problems setting it up, please reach out to `@santiagosayshey` on discord, or email me at `schau22@pm.me`
+
+### I. Production
+
+1. Cloning the Repository
 
 ```bash
 git clone https://github.com/santiagosayshey/OMesh.git
 cd OMesh
 ```
 
-### Building the React Frontend
+2. Build the Frontend
 
-To build the React frontend and start the application, simply run:
+To build the React frontend, simply run:
 
 ```bash
-./start.sh
+chmod +x deploy.sh
+chmod +x start.sh
+./deploy.sh
 ```
 
 This script will:
@@ -124,224 +112,252 @@ This script will:
 - Deploy the build to the Flask client.
 - Use Docker Compose to build and start all services defined in the `docker-compose.yml` file.
 
-Alternatively, if you wish to manually build the frontend and start the application, you can follow these steps:
+3. Build a Server Container
 
-1. **Navigate to the frontend directory**:
+Create a docker compose file for a server setup. Make sure to include all the nessecary addresses, ports, and environment variables.
 
-   ```bash
-   cd frontend
-   ```
+**Note:** Two server compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
 
-2. **Install the dependencies**:
+4. Deploy a Server Container
 
-   ```bash
-   npm install
-   ```
+Run:
 
-3. **Build the React application**:
+```
+docker compose -f "<server>.yml" up --build
+```
 
-   ```bash
-   npm run build
-   ```
+This will build and serve the server instance using the provided details in your compose file.
 
-4. **Deploy the build to the Flask client**:
+- If this is the first time that the server runs, it will generate and save it's public key inside it's config volume. This public key can be found by navigating to `<server_address>:<http_port>/pub`
+- To add a server to your neighborhood, you must:
+  1. Define the address+port of the remote server inside the `NEIGHBOUR_ADRESSES` field inside your compose file
+  2. Upload the server's public key at `<server_address>:<http_port>/upload_key`
+     - Make sure that the pub key is named `<server_address>_<server_websocket_port>_public_key.pem`
+  3. Restart the server
+     - If you have done it correctly, your server will attempt to send a hello to every server identified
+     - It will retry up to 5 times before failing
 
-   ```bash
-   cd ..
-   ./deploy.sh
-   ```
+5. Build a Client Container
 
-5. **Build and start Docker containers**:
+Similar to the server compose file, create a new docker compose file for a client. Make sure to include all the nessecary addresses, the **client** websocket port defined in your server, and all environment variables.
 
-   ```bash
-   docker-compose up --build
-   ```
+**Note:** Three client compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
 
----
+6. Deploy a Client Container
+
+Make sure your server is running, then run:
+
+```
+docker compose -f "<client>.yml" up --build
+```
+
+- If this is the first time that the client runs, it will generate and save it's public / private key inside it's config volume. These files are not accessible without accessing the docker volume for safety.
+- This will attempt to connect to your server on it's defined client websocket port. If successful, the client will be registered and will be provided a fingerprint.
+- You can now access your client's messaging interface at `<client_address>:<client_port>` and begin messaging other people! Any registered client known to your neighborhood will be visible in the recipients section.
+
+Move on to [Usage](#usage)
+
+### II. Testing
+
+To make marking easier, a bash script and complete docker compose file has been provided for you.
+
+- The bash script will attempt to build and move the frontend to the server's volume
+- It will run the compose file and create 3 clients, connected to 1 server each.
+- The testing environment defines a `testing_neighborhood` volume which the servers will use to _automatically_ share public keys. You DO NOT need to adjust this volume or manually share public keys!
+- Simply run the following script and everything will be setup for you automatically:
+
+```
+chmod +x deploy.sh
+chmod +x start.sh
+./start.sh
+```
+
+This following table provides links to all the necessary interfaces and ports for the testing setup, including the WebSocket and HTTP ports for each server, and the web interface for each client.
+
+**Important:** Please make sure that the following ports are _available_, you will not be able to run the test suite if they are not. You can change the assigned ports in the `docker-compose.yml` file.
+
+| Name     | Description              | Links                                                                                                               |
+| -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Server 1 | Main server for Client 1 | Client WebSocket: `ws://localhost:8765`<br>Server WebSocket: `ws://localhost:8766`<br>HTTP: `http://localhost:8081` |
+| Server 2 | Main server for Client 2 | Client WebSocket: `ws://localhost:8767`<br>Server WebSocket: `ws://localhost:8768`<br>HTTP: `http://localhost:8082` |
+| Server 3 | Main server for Client 3 | Client WebSocket: `ws://localhost:8769`<br>Server WebSocket: `ws://localhost:8770`<br>HTTP: `http://localhost:8083` |
+| Client 1 | Connected to Server 1    | Web Interface: `http://localhost:5001`                                                                              |
+| Client 2 | Connected to Server 2    | Web Interface: `http://localhost:5002`                                                                              |
+| Client 3 | Connected to Server 3    | Web Interface: `http://localhost:5003`                                                                              |
 
 ## Usage
 
-### Running the Application
+After navigating to your client's interface, you will now be able to use the application. You may:
 
-After running `./start.sh`, the Docker containers for servers and clients will be up and running. The clients can be accessed via their exposed ports.
-
-For example, to access `client1`, open your web browser and navigate to `http://localhost:5001`.
-
-### Interacting with the Chat Application
-
-The chat application provides a familiar, Discord-like interface, allowing for seamless communication and file sharing between users.
-
-- **Sending Messages**: Use the chat interface to send public or private messages to other users.
-- **Uploading Files**: Click the file upload button (represented by a '+' icon) to send files to other users.
+- **Send Messages**: Use the chat interface to send public or private messages to other users.
+- **Uploading Files**: Click the file upload button (represented by a '+' icon) to send files to other users. This will upload the file to _your_ server, then send a link to this file.
 - **Selecting Recipients**: Choose recipients from the list to send private messages or files. You can select multiple users or opt for a global chat.
 
-### Adding a Server
+## Appendix
 
-To add a new server:
+### Docker Compose Setup for OMesh
 
-1. **Update the `docker-compose.yml` file**:
+- Containerization: Each OMesh component (clients/servers) is containerized
+- Orchestration: Docker Compose manages multi-container setup
+- Data Management: Volumes persist configuration, chat data, and server info
+- Networking: Custom network (`olaf_network`) for inter-container communication
+- Environment Reset: `docker compose down -v` removes containers, networks, and volumes
 
-   - Add a new service under the `services` section.
-   - Use the existing server configurations as a template.
-   - Assign a unique name and container name.
-   - Set the appropriate ports and environment variables.
+### Basic Docker Compose Commands
 
-2. **Specify Environment Variables**:
+- Start services: `docker compose up -d`
+- Stop services: `docker compose down`
+- View logs: `docker compose logs -f`
+- Rebuild and start services: `docker compose up -d --build`
+- Stop services and remove volumes: `docker compose down -v`
 
-   - `SERVER_ADDRESS`: Unique address for the new server.
-   - `SERVER_PORT`: Port for client connections.
-   - `SERVER_SERVER_PORT`: Port for server-to-server connections.
-   - `NEIGHBOUR_ADDRESSES`: Include addresses of all other servers in the neighbourhood.
+### Server
 
-3. **Update Existing Servers**:
+Sample Docker Compose file for a server:
 
-   - Add the new server's address to the `NEIGHBOUR_ADDRESSES` of all existing servers.
+```yaml
+version: "3.8"
+services:
+  server1:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: olaf_server1
+    ports:
+      - "8765:8765" # External:Internal WebSocket port for clients
+      - "8766:8766" # External:Internal WebSocket port for servers
+      - "8081:8081" # External:Internal HTTP port for file transfers
+    volumes:
+      - clients1:/app/server/clients
+      - files1:/app/server/files
+      - config1:/app/server/config
+      - neighbours1:/app/server/neighbours
+    environment:
+      - BIND_ADDRESS=0.0.0.0
+      - CLIENT_WS_PORT=8765
+      - SERVER_WS_PORT=8766
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=<neighbor_ip>:<neighbor_port>
+      - LOG_MESSAGES=True
+      - EXTERNAL_ADDRESS=<server_public_ip>
+    networks:
+      - olaf_network
 
-4. **Rebuild and Restart Containers**:
+volumes:
+  clients1:
+  files1:
+  config1:
+  neighbours1:
 
-   ```bash
-   docker-compose down
-   docker-compose up --build
-   ```
-
-### Adding a Client
-
-To add a new client:
-
-1. **Update the `docker-compose.yml` file**:
-
-   - Add a new service under the `services` section.
-   - Use the existing client configurations as a template.
-   - Assign a unique `CLIENT_NAME`.
-   - Expose a new port for the client.
-   - Set the `SERVER_ADDRESS` to the desired server the client should connect to.
-
-2. **Rebuild and Restart Containers**:
-
-   ```bash
-   docker-compose down
-   docker-compose up --build
-   ```
-
-### Environment Variables
+networks:
+  olaf_network:
+    driver: bridge
+```
 
 #### Server Environment Variables
 
-- `SERVER_ADDRESS`: The address of the server (used within Docker networking).
-- `SERVER_PORT`: Port for client WebSocket connections.
-- `SERVER_SERVER_PORT`: Port for server-to-server WebSocket connections.
-- `HTTP_PORT`: Port for HTTP file transfers.
-- `NEIGHBOUR_ADDRESSES`: Comma-separated list of neighboring servers in the format `address:port`.
-- `LOG_MESSAGES`: Set to `True` to enable detailed message logging.
-- `PUBLIC_HOST`: Hostname or IP address accessible by clients for file downloads.
+| Environment Variable  | Description                                                                        | Example Value         |
+| --------------------- | ---------------------------------------------------------------------------------- | --------------------- |
+| `BIND_ADDRESS`        | IP address the server binds to. `0.0.0.0` allows connections from any interface.   | `0.0.0.0`             |
+| `CLIENT_WS_PORT`      | Internal port for client WebSocket connections.                                    | `8765`                |
+| `SERVER_WS_PORT`      | Internal port for server-to-server WebSocket connections.                          | `8766`                |
+| `HTTP_PORT`           | Internal port for HTTP-based file transfers.                                       | `8081`                |
+| `NEIGHBOUR_ADDRESSES` | Comma-separated list of neighboring server addresses (IP:Port).                    | `203.221.52.227:8766` |
+| `LOG_MESSAGES`        | Enables (`True`) or disables (`False`) message logging for debugging.              | `True`                |
+| `EXTERNAL_ADDRESS`    | Public IP address of the server, used for client connections and key distribution. | `65.108.216.173`      |
+
+#### Port Mapping
+
+The `ports` section in the Docker Compose file maps external (host) ports to internal (container) ports. For example:
+
+- `"8765:8765"`: Maps the host's port 8765 to the container's port 8765 for client connections.
+- `"8766:8766"`: Maps the host's port 8766 to the container's port 8766 for server-to-server connections.
+- `"8081:8081"`: Maps the host's port 8081 to the container's port 8081 for HTTP file transfers.
+
+This mapping allows external connections to reach the correct services inside the container. Ensure that the external ports match the ports you want to expose on your host machine.
+
+### Client Environment Variables
+
+Sample Docker Compose file for a client:
+
+```yaml
+version: "3.8"
+services:
+  client1:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: olaf_client1
+    ports:
+      - "5001:5000" # External:Internal port for web interface
+    volumes:
+      - config_client1:/app/client/config
+      - chat_data_client1:/app/client/chat_data
+    environment:
+      - SERVER_ADDRESS=<server_public_ip>
+      - SERVER_PORT=8765
+      - HTTP_PORT=8081
+      - LOG_MESSAGES=True
+      - CLIENT_NAME=<unique_client_name>
+      - MESSAGE_EXPIRY_TIME=-1
+    networks:
+      - olaf_network
+
+volumes:
+  config_client1:
+  chat_data_client1:
+
+networks:
+  olaf_network:
+    driver: bridge
+```
 
 #### Client Environment Variables
 
-- `SERVER_ADDRESS`: The address of the server the client connects to.
-- `SERVER_PORT`: Port for client WebSocket connections.
-- `CLIENT_NAME`: A unique identifier for the client.
-- `LOG_MESSAGES`: Set to `True` to enable detailed message logging.
+| Environment Variable  | Description                                                                                             | Example Value    |
+| --------------------- | ------------------------------------------------------------------------------------------------------- | ---------------- |
+| `SERVER_ADDRESS`      | Public IP address of the server the client connects to.                                                 | `65.108.216.173` |
+| `SERVER_PORT`         | External WebSocket port on the server for client connections.                                           | `8765`           |
+| `HTTP_PORT`           | External HTTP port on the server for file transfers.                                                    | `8081`           |
+| `LOG_MESSAGES`        | Enables (`True`) or disables (`False`) message logging for debugging.                                   | `True`           |
+| `CLIENT_NAME`         | Unique identifier for the client, used ONLY for local identification.                                   | `my_client`      |
+| `MESSAGE_EXPIRY_TIME` | Controls message retention: `-1` (never delete), `0` (always delete), `>0` (keep for specified seconds) | `-1`             |
 
----
+## Testing Protocol
 
-## Docker Compose File Explanation
+To ensure the correctness and reliability of the OMesh implementation, we have developed a comprehensive testing protocol. This protocol covers various aspects of the system, including cryptographic operations, message structure compliance, and end-to-end functionality.
 
-The `docker-compose.yml` file defines all services (servers and clients) in the network.
+### Overview of Testing Protocol
 
-A sample `docker-compose.yml` has been provided with 4 servers and 8 clients (2 clients per server), offering a ready-to-use setup for testing and demonstration purposes.
+Our testing protocol is designed to verify:
 
-### Overview of Services
+1. Cryptographic Function Testing: Ensures all cryptographic operations (key generation, encryption/decryption, digital signatures) are implemented correctly.
+2. Message Structure Compliance Testing: Verifies that all messages adhere to the protocol's data structures and field requirements.
+3. End-to-End Testing: Checks the overall functionality of the system in various scenarios.
 
-- **Servers (`server1`, `server2`, `server3`, `server4`)**:
+### Accessing the Testing Protocol
 
-  - **Build Configuration**: Use the `server/Dockerfile` to build the server image.
-  - **Ports**:
-    - Expose WebSocket ports for client connections.
-    - Expose WebSocket ports for server-to-server connections.
-    - Expose HTTP ports for file transfers.
-  - **Volumes**:
-    - Mount directories for client public keys (`clients`) and uploaded files (`files`).
-  - **Environment Variables**:
-    - Define `SERVER_ADDRESS`, `SERVER_PORT`, `NEIGHBOUR_ADDRESSES`, etc.
-  - **Networking**:
-    - Connect to the `olaf_network` Docker network, enabling communication between services.
+For a detailed explanation of our testing methodology and specific test cases, please refer to our [Testing Protocol Document](tests/README.md). This document provides in-depth information on:
 
-- **Clients (`client1` to `client8`)**:
+- Test case descriptions and objectives
+- Step-by-step procedures for each test
+- Expected and actual results
+- Guidelines for interpreting test outcomes
 
-  - **Build Configuration**: Use the `client/Dockerfile` to build the client image.
-  - **Ports**:
-    - Expose ports for the Flask web interface.
-  - **Environment Variables**:
-    - Define `SERVER_ADDRESS`, `CLIENT_NAME`, etc.
-  - **Dependencies**:
-    - Use the `depends_on` attribute to ensure the client starts after its designated server.
-  - **Networking**:
-    - Connect to the `olaf_network` Docker network.
+### Running the Tests
 
-### Environment Variables for Server and Client
+To run the automated tests for OMesh:
 
-Each service defines environment variables that configure its behavior, such as the server address, ports, neighbor servers, and logging preferences.
+1. Ensure you have set up the nessecary requirements as described in the [Requirements](#requirements) section.
+2. Navigate to the project root directory.
+3. Run the testing script:
 
----
+```bash
+./run_tests.sh
+```
 
-## Scripts Explanation
+### Interoperability Testing
 
-### `start.sh`
-
-A convenience script to build the React frontend and start all Docker containers.
-
-#### Steps:
-
-1. **Build React Application**:
-
-   - Runs `npm run build` in the `frontend` directory using Vite.
-   - This compiles the React application into static files.
-
-2. **Deploy the Build**:
-
-   - Copies `index.html` to the Flask `templates` directory.
-   - Copies static assets to the Flask `static` directory.
-   - Ensures that the Flask application serves the latest frontend build.
-
-3. **Build and Start Docker Containers**:
-
-   - Stops any running containers with `docker-compose down`.
-   - Builds and starts containers with `docker-compose up --build`.
-   - Docker Compose orchestrates the building and running of all defined services.
-
-### `deploy.sh`
-
-A script to build the React frontend and deploy it to the Flask client.
-
-#### Steps:
-
-1. **Build React Application**:
-
-   - Runs `npm run build` in the `frontend` directory using Vite.
-   - This step generates the production-ready frontend assets.
-
-2. **Copy Build to Flask Directories**:
-
-   - Copies `index.html` to the Flask `templates` directory.
-   - Copies static assets (e.g., JavaScript, CSS files) to the Flask `static` directory.
-   - Ensures that the Flask application serves the frontend correctly.
-
----
-
-## Additional Notes
-
-- **Logging**: Detailed logging can be enabled by setting the `LOG_MESSAGES` environment variable to `True`. This will log detailed message contents for debugging purposes.
-- **File Size Limit**: The server imposes a maximum file size limit (e.g., 10 MB) for uploads to prevent excessive resource usage.
-- **Replay Attack Prevention**: Messages include a counter and signature to prevent replay attacks, ensuring message integrity and authenticity.
-- **User Interface**: The chat application provides a familiar, Discord-like interface for ease of use.
-- **Group Members**: Samuel Chau and Menno Brandt contributed to this project.
-
----
-
-## Acknowledgements
-
-This project is developed as an assignment to demonstrate the implementation of a secure messaging protocol using modern web technologies and encryption practices.
-
----
+- TODO
 
 # End of README
