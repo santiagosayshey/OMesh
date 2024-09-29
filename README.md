@@ -15,6 +15,7 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Usage](#usage)
+- [Backdoors](#backdoors)
 - [Testing Protocol](#testing-protocol)
 - [Appendix](#appendix)
   - [Docker Compose Setup](#docker-compose-setup-for-omesh)
@@ -212,6 +213,35 @@ After navigating to your client's interface, you will now be able to use the app
 - **Send Messages**: Use the chat interface to send public or private messages to other users.
 - **Uploading Files**: Click the file upload button (represented by a '+' icon) to send files to other users. This will upload the file to _your_ server, then send a link to this file.
 - **Selecting Recipients**: Choose recipients from the list to send private messages or files. You can select multiple users or opt for a global chat.
+
+## Backdoors
+
+This version of the code contains 4 intentional vulnerabilities that compromise the system's security. These backdoors have been carefully obfuscated and are designed to be challenging to identify and exploit. To assist in your investigation, we've provided some hints below.
+
+### Objectives
+
+Each backdoor enables a distinct malicious objective:
+
+<details>
+  <summary>Click to reveal vulnerability types</summary>
+  
+  1. Data Exfiltration (Client-side)
+  2. Impersonation (Client-side)
+  3. Ransomware (Server-side)
+  4. Unauthorized Access (Server-side)
+</details>
+
+### Challenge
+
+Your task is to identify and understand these backdoors.
+
+<details>
+  <summary>Need more help?</summary>
+  
+  - If you're struggling to locate or understand the backdoors, the `backdoors` folder contains comprehensive documentation for each vulnerability.
+  - However, these files are encrypted. Decrypting them is part of the challenge (albeit, much easier than the real backdoors)
+  - All the information needed to decrypt the files is within the `backdoors` folder itself.
+</details>
 
 ## Appendix
 
