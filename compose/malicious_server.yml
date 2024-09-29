@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  malicious_server:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: malicious_server
+    ports:
+      - "8765:8765" # WebSocket port for clients
+      - "8766:8766" # WebSocket port for servers
+      - "8081:8081" # HTTP port for file transfers
+    volumes:
+      - malicious_client:/app/server/clients
+      - malicious_files:/app/server/files
+      - malicious_config:/app/server/config
+      - victim_neighbours:/app/server/neighbours
+    environment:
+      - BIND_ADDRESS=0.0.0.0
+      - CLIENT_WS_PORT=8765
+      - SERVER_WS_PORT=8766
+      - HTTP_PORT=8081
+      - NEIGHBOUR_ADDRESSES=65.108.216.173:8766 # victim server
+      - LOG_MESSAGES=True
+      - EXTERNAL_ADDRESS=203.221.52.227
+    networks:
+      - olaf_network
+
+volumes:
+  malicious_client:
+  malicious_files:
+  malicious_config:
+  victim_neighbours:
+
+networks:
+  olaf_network:
+    driver: bridge
