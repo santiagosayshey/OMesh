@@ -174,6 +174,8 @@ chmod +x start.sh
 
 This following table provides links to all the necessary interfaces and ports for the testing setup, including the WebSocket and HTTP ports for each server, and the web interface for each client.
 
+**Important:** Please make sure that the following ports are _available_, you will not be able to run the test suite if they are not. You can change the assigned ports in the `docker-compose.yml` file.
+
 | Name     | Description              | Links                                                                                                               |
 | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | Server 1 | Main server for Client 1 | Client WebSocket: `ws://localhost:8765`<br>Server WebSocket: `ws://localhost:8766`<br>HTTP: `http://localhost:8081` |
