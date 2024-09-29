@@ -102,7 +102,6 @@ To build the React frontend, run:
 
 ```bash
 chmod +x deploy.sh
-chmod +x start.sh
 ./deploy.sh
 ```
 
@@ -110,7 +109,6 @@ This script will:
 
 - Build the React front end using Vite.
 - Deploy the build to the Flask client.
-- Use Docker Compose to build and start all services defined in the `docker-compose.yml` file.
 
 3. Build a Server Container
 
