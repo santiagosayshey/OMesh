@@ -58,7 +58,7 @@ The OLAF's Neighbourhood protocol enables secure, decentralized communication:
 Key features and implementation details:
 
 - **WebSocket Communication**: For real-time client-server and server-server data exchange.
-- **Neighbourboods**: Manually define neighbourhoods by sharing public keys.
+- **Neighbourhoods**: Manually define neighbourhoods by sharing public keys.
 - **Server Connection**: Servers send a `hello_server` message to establish websocket connection.
 - **Client Registration**: Clients send a `hello` message to establish identity.
 - **End-to-End Encryption**: Uses RSA for asymmetric and AES-GCM for symmetric encryption.
@@ -77,7 +77,7 @@ Key features and implementation details:
 - **Node.js and NPM**: For building the React frontend.
 - **Python 3.9**: Necessary for running test scripts outside Docker, if needed.
 
-**Note for Markers:** Please make sure you have docker compose 2.10+ installed. Python is nessecary for testing purposes, but not for the main application. A standalone python image is used in the docker containers.
+**Note for Markers:** Please make sure you have docker compose 2.10+ installed. Python is necessary for testing purposes, but not for the main application. A standalone Python image is used in the docker containers.
 
 ---
 
@@ -85,7 +85,7 @@ Key features and implementation details:
 
 This section is split into two main parts: I. Production and II. Testing. If you want to use OMesh in a production environment, please follow the instructions noted there. **If you are marking this assignment, please follow the testing instructions instead.**
 
-**Note for Markers:** If you would like to test OMesh with your own implemenations, please follow the production steps to setup a custom server/client container. Otherwise, the testing setup will be sufficient to give feedback. If you have any problems setting it up, please reach out to `@santiagosayshey` on discord, or email me at `schau22@pm.me`
+**Note for Markers:** If you would like to test OMesh with your implementations, please follow the production steps to set up a custom server/client container. Otherwise, the testing setup will be sufficient to give feedback. If you have any problems setting it up, please reach out to `@santiagosayshey` on Discord, or email me at `schau22@pm.me`
 
 ### I. Production
 
@@ -98,7 +98,7 @@ cd OMesh
 
 2. Build the Frontend
 
-To build the React frontend, simply run:
+To build the React frontend, run:
 
 ```bash
 chmod +x deploy.sh
@@ -108,15 +108,15 @@ chmod +x start.sh
 
 This script will:
 
-- Build the React frontend using Vite.
+- Build the React front end using Vite.
 - Deploy the build to the Flask client.
 - Use Docker Compose to build and start all services defined in the `docker-compose.yml` file.
 
 3. Build a Server Container
 
-Create a docker compose file for a server setup. Make sure to include all the nessecary addresses, ports, and environment variables.
+Create a docker-compose file for a server setup. Ensure that the necessary addresses, ports, and environment variables are included.
 
-**Note:** Two server compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
+**Note:** Two server compose files have been provided in `/compose`. An appendix explaining its structure has been provided in this README's appendix.
 
 4. Deploy a Server Container
 
@@ -128,8 +128,8 @@ docker compose -f "<server>.yml" up --build
 
 This will build and serve the server instance using the provided details in your compose file.
 
-- If this is the first time that the server runs, it will generate and save it's public key inside it's config volume. This public key can be found by navigating to `<server_address>:<http_port>/pub`
-- To add a server to your neighborhood, you must:
+- If this is the first time that the server runs, it will generate and save its public key inside its config volume. This public key can be found by navigating to `<server_address>:<http_port>/pub`
+- To add a server to your neighbourhood, you must:
   1. Define the address+port of the remote server inside the `NEIGHBOUR_ADRESSES` field inside your compose file
   2. Upload the server's public key at `<server_address>:<http_port>/upload_key`
      - Make sure that the pub key is named `<server_address>_<server_websocket_port>_public_key.pem`
@@ -139,9 +139,9 @@ This will build and serve the server instance using the provided details in your
 
 5. Build a Client Container
 
-Similar to the server compose file, create a new docker compose file for a client. Make sure to include all the nessecary addresses, the **client** websocket port defined in your server, and all environment variables.
+Similar to the server compose file, create a new docker-compose file for a client. Make sure to include all the necessary addresses, the **client** websocket port defined in your server, and all environment variables.
 
-**Note:** Three client compose files has been provided in `/compose`. An appendix explaining it's structure has been provided in this README's appendix.
+**Note:** Three client compose files have been provided in `/compose`. An appendix explaining its structure has been provided in this README's appendix.
 
 6. Deploy a Client Container
 
@@ -151,20 +151,20 @@ Make sure your server is running, then run:
 docker compose -f "<client>.yml" up --build
 ```
 
-- If this is the first time that the client runs, it will generate and save it's public / private key inside it's config volume. These files are not accessible without accessing the docker volume for safety.
-- This will attempt to connect to your server on it's defined client websocket port. If successful, the client will be registered and will be provided a fingerprint.
-- You can now access your client's messaging interface at `<client_address>:<client_port>` and begin messaging other people! Any registered client known to your neighborhood will be visible in the recipients section.
+- If this is the first time that the client runs, it will generate and save it's public/private key inside its config volume. These files are not accessible without accessing the docker volume for safety.
+- This will attempt to connect to your server on its defined client websocket port. If successful, the client will be registered and will be provided a fingerprint.
+- You can now access your client's messaging interface at `<client_address>:<client_port>` and begin messaging other people! Any registered client known to your neighbourhood will be visible in the recipients' section.
 
 Move on to [Usage](#usage)
 
 ### II. Testing
 
-To make marking easier, a bash script and complete docker compose file has been provided for you.
+To make marking easier, a bash script and complete docker-compose file has been provided for you.
 
 - The bash script will attempt to build and move the frontend to the server's volume
 - It will run the compose file and create 3 clients, connected to 1 server each.
 - The testing environment defines a `testing_neighborhood` volume which the servers will use to _automatically_ share public keys. You DO NOT need to adjust this volume or manually share public keys!
-- Simply run the following script and everything will be setup for you automatically:
+- Simply run the following script and everything will be set for you automatically:
 
 ```
 chmod +x deploy.sh
@@ -172,7 +172,9 @@ chmod +x start.sh
 ./start.sh
 ```
 
-This following table provides links to all the necessary interfaces and ports for the testing setup, including the WebSocket and HTTP ports for each server, and the web interface for each client.
+**Note:** The clients will fail to connect to servers on their first attempt - this is expected. The servers take a few seconds to set themselves up and share public keys. The clients will successfully connect their second attempt!
+
+The following table links all the necessary interfaces and ports for the testing setup, including the WebSocket and HTTP ports for each server, and the web interface for each client.
 
 **Important:** Please make sure that the following ports are _available_, you will not be able to run the test suite if they are not. You can change the assigned ports in the `docker-compose.yml` file.
 
@@ -262,7 +264,7 @@ networks:
 | `CLIENT_WS_PORT`      | Internal port for client WebSocket connections.                                    | `8765`                |
 | `SERVER_WS_PORT`      | Internal port for server-to-server WebSocket connections.                          | `8766`                |
 | `HTTP_PORT`           | Internal port for HTTP-based file transfers.                                       | `8081`                |
-| `NEIGHBOUR_ADDRESSES` | Comma-separated list of neighboring server addresses (IP:Port).                    | `203.221.52.227:8766` |
+| `NEIGHBOUR_ADDRESSES` | Comma-separated list of neighbouring server addresses (IP:Port).                    | `203.221.52.227:8766` |
 | `LOG_MESSAGES`        | Enables (`True`) or disables (`False`) message logging for debugging.              | `True`                |
 | `EXTERNAL_ADDRESS`    | Public IP address of the server, used for client connections and key distribution. | `65.108.216.173`      |
 
@@ -348,7 +350,7 @@ For a detailed explanation of our testing methodology and specific test cases, p
 
 To run the automated tests for OMesh:
 
-1. Ensure you have set up the nessecary requirements as described in the [Requirements](#requirements) section.
+1. Ensure you have set up the requirements described in the [Requirements](#requirements) section.
 2. Navigate to the project root directory.
 3. Run the testing script:
 
