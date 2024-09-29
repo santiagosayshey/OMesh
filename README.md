@@ -158,7 +158,7 @@ Move on to [Usage](#usage)
 ### II. Testing
 
 To make marking easier, a bash script and complete docker-compose file has been provided for you.
-
+- All the necessary files are provided in the ZIP file your should have received. 
 - The bash script will attempt to build and move the frontend to the server's volume
 - It will run the compose file and create 3 clients, connected to 1 server each.
 - The testing environment defines a `testing_neighborhood` volume which the servers will use to _automatically_ share public keys. You DO NOT need to adjust this volume or manually share public keys!
