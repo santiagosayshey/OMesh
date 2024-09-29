@@ -83,20 +83,39 @@ Key features and implementation details:
 
 ## Setup
 
-This section is split into two main parts: I. Production and II. Testing. If you want to use OMesh in a production environment, please follow the instructions noted there. **If you are marking this assignment, please follow the testing instructions instead.**
+Before proceeding, you need to clone the repo or download the ZIP file (already provided if you are making), then install the frontend dependencies:
 
-**Note for Markers:** If you would like to test OMesh with your implementations, please follow the production steps to set up a custom server/client container. Otherwise, the testing setup will be sufficient to give feedback. If you have any problems setting it up, please reach out to `@santiagosayshey` on Discord, or email me at `schau22@pm.me`
-
-### I. Production
-
-1. Cloning the Repository
+1. Cloning the Repository (only if you haven't already downloaded the ZIP)
 
 ```bash
 git clone https://github.com/santiagosayshey/OMesh.git
 cd OMesh
 ```
 
-2. Build the Frontend
+2. Navigate to the frontend directory:
+
+   ```bash
+   cd frontend
+   ```
+
+3. Install the necessary npm packages:
+
+   ```bash
+   npm install
+   ```
+
+4. Return to the root directory:
+   ```bash
+   cd ..
+   ```
+
+The remaining section is split into two main parts: I. Production and II. Testing. If you want to use OMesh in a production environment, please follow the instructions noted there. **If you are marking this assignment, please follow the testing instructions instead.**
+
+**Note for Markers:** If you would like to test OMesh with your implementations, please follow the production steps to set up a custom server/client container. Otherwise, the testing setup will be sufficient to give feedback. If you have any problems setting it up, please reach out to `@santiagosayshey` on Discord, or email me at `schau22@pm.me`
+
+### I. Production
+
+1. Build the Frontend
 
 To build the React frontend, run:
 
@@ -110,13 +129,13 @@ This script will:
 - Build the React front end using Vite.
 - Deploy the build to the Flask client.
 
-3. Build a Server Container
+2. Build a Server Container
 
 Create a docker-compose file for a server setup. Ensure that the necessary addresses, ports, and environment variables are included.
 
 **Note:** Two server compose files have been provided in `/compose`. An appendix explaining its structure has been provided in this README's appendix.
 
-4. Deploy a Server Container
+3. Deploy a Server Container
 
 Run:
 
@@ -135,13 +154,13 @@ This will build and serve the server instance using the provided details in your
      - If you have done it correctly, your server will attempt to send a hello to every server identified
      - It will retry up to 5 times before failing
 
-5. Build a Client Container
+4. Build a Client Container
 
 Similar to the server compose file, create a new docker-compose file for a client. Make sure to include all the necessary addresses, the **client** websocket port defined in your server, and all environment variables.
 
 **Note:** Three client compose files have been provided in `/compose`. An appendix explaining its structure has been provided in this README's appendix.
 
-6. Deploy a Client Container
+5. Deploy a Client Container
 
 Make sure your server is running, then run:
 
@@ -158,7 +177,8 @@ Move on to [Usage](#usage)
 ### II. Testing
 
 To make marking easier, a bash script and complete docker-compose file has been provided for you.
-- All the necessary files are provided in the ZIP file your should have received. 
+
+- All the necessary files are provided in the ZIP file your should have received.
 - The bash script will attempt to build and move the frontend to the server's volume
 - It will run the compose file and create 3 clients, connected to 1 server each.
 - The testing environment defines a `testing_neighborhood` volume which the servers will use to _automatically_ share public keys. You DO NOT need to adjust this volume or manually share public keys!
@@ -262,7 +282,7 @@ networks:
 | `CLIENT_WS_PORT`      | Internal port for client WebSocket connections.                                    | `8765`                |
 | `SERVER_WS_PORT`      | Internal port for server-to-server WebSocket connections.                          | `8766`                |
 | `HTTP_PORT`           | Internal port for HTTP-based file transfers.                                       | `8081`                |
-| `NEIGHBOUR_ADDRESSES` | Comma-separated list of neighbouring server addresses (IP:Port).                    | `203.221.52.227:8766` |
+| `NEIGHBOUR_ADDRESSES` | Comma-separated list of neighbouring server addresses (IP:Port).                   | `203.221.52.227:8766` |
 | `LOG_MESSAGES`        | Enables (`True`) or disables (`False`) message logging for debugging.              | `True`                |
 | `EXTERNAL_ADDRESS`    | Public IP address of the server, used for client connections and key distribution. | `65.108.216.173`      |
 
