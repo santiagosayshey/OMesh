@@ -83,7 +83,7 @@ Key features and implementation details:
 
 ## Setup
 
-Before proceeding, you need to clone the repo or download the ZIP file (already provided if you are making), then install the frontend dependencies:
+Before proceeding, you need to clone the repo or download the ZIP file (already provided if you are marking this assignment), then install the frontend dependencies:
 
 1. Cloning the Repository (only if you haven't already downloaded the ZIP)
 
