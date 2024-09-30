@@ -4,6 +4,10 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 
 **Group Members:** Samuel Chau and Menno Brandt
 
+## Academic Integrity
+
+Under no circumstances is anyone allowed to copy any part of this repository for their own secure programming assignment. While this is *still* an open source project and is freely to view / download / modify to your hearts content, students enrolled in secure programming must abide by acadmeic integrity rules. Use it for inspiration or to clarify something, but DO NOT COPY anything for your own assignment. 
+
 ---
 
 ## Table of Contents
