@@ -6,7 +6,7 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 
 ## Academic Integrity
 
-Under no circumstances is anyone allowed to copy any part of this repository for their own secure programming assignment. While this is *still* an open-source project and you are free to view/download/modify it to your heart's content, students enrolled in secure programming must abide by academic integrity rules. You can use it to inspire or clarify something, but please don't copy anything for your assignment. Please remember that there is an extremely extensive commit log detailing my development. 
+Under no circumstances is anyone allowed to copy any part of this repository for their own secure programming assignment. While this is *still* an open-source project and you are free to view/download/modify it to your heart's content, students enrolled in secure programming must abide by academic integrity rules. You can use it to inspire or clarify something, but please don't copy anything for your assignment.
 
 ---
 
