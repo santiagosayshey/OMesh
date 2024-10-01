@@ -6,7 +6,7 @@ An open-source implementation of the OLAF's Neighbourhood protocol, developed us
 
 ## Academic Integrity
 
-Under no circumstances is anyone allowed to copy any part of this repository for their own secure programming assignment. While this is *still* an open-source project and you are free to view/download/modify it to your heart's content, students enrolled in secure programming must abide by academic integrity rules. You can use it to inspire or clarify something, but please don't copy anything for your assignment.
+Under no circumstances is anyone allowed to copy any part of this repository for their own secure programming assignment. While this is _still_ an open-source project and you are free to view/download/modify it to your heart's content, students enrolled in secure programming must abide by academic integrity rules. You can use it to inspire or clarify something, but please don't copy anything for your assignment.
 
 ---
 
@@ -186,7 +186,7 @@ To make marking easier, a bash script and complete docker-compose file has been 
 - The bash script will attempt to build and move the frontend to the server's volume
 - It will run the compose file and create 3 clients, connected to 1 server each.
 - The testing environment defines a `testing_neighborhood` volume which the servers will use to _automatically_ share public keys. You DO NOT need to adjust this volume or manually share public keys!
-- Simply run the following script and everything will be set for you automatically:
+- Simply run the following script and everything will be setup for you automatically:
 
 ```
 chmod +x deploy.sh
