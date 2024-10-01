@@ -15,9 +15,7 @@ Crucially, this malicious script can itself call `/get_messages`, but instead of
 This backdoor violates several key security principles:
 
 - Confidentiality: It allows unauthorized access to private messages intended only for specific recipients.
-- Integrity: The attacker can potentially modify or inject false messages into the chat system.
 - Authentication: The backdoor bypasses any authentication measures in place for accessing private messages.
-- Non-repudiation: Users could deny sending certain messages, as the attacker could impersonate them.
 - Trust: It undermines the trust users place in the system's ability to keep their communications private.
 
 ## Exploitation Method (Proof of Concept)
