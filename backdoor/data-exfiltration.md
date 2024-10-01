@@ -85,7 +85,7 @@ Server listening at http://localhost:3000
 
 7. Victim client loads XSS attack, which forces them to send their messages to the attacker's server.
 
-```json
+```
 [ 0 16:51:34 the-zodiac-killer ~/Documents/OMesh/backdoor/appendix ] $ node server.js
 Server listening at http://localhost:3000
 Received POST request at /return
