@@ -77,7 +77,7 @@ Server listening at http://localhost:3000
 
 6. Attacker sends a private XSS attack to client 2 and waits for them to refresh their messages.
 
-![Image 1.4](appendix/Image%203.3.png)
+![Image 1.4](appendix/Image%201.4.png)
 
 <p align="center"><em>Figure 1.4: Client 2 retrieves the XSS attack!</em></p>
 
