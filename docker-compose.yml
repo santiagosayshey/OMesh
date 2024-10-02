@@ -39,7 +39,7 @@ services:
     ports:
       - "8767:8765"
       - "8768:8766"
-      - "8082:8081"
+      - "8082:8082"
     volumes:
       - test_clients2:/app/server/clients
       - test_files2:/app/server/files
@@ -50,7 +50,7 @@ services:
       - BIND_ADDRESS=0.0.0.0
       - CLIENT_WS_PORT=8765
       - SERVER_WS_PORT=8766
-      - HTTP_PORT=8081
+      - HTTP_PORT=8082
       - NEIGHBOUR_ADDRESSES=server1:8766,server3:8766
       - LOG_MESSAGES=True
       - EXTERNAL_ADDRESS=server2
@@ -69,7 +69,7 @@ services:
     ports:
       - "8769:8765"
       - "8770:8766"
-      - "8083:8081"
+      - "8083:8083"
     volumes:
       - test_clients3:/app/server/clients
       - test_files3:/app/server/files
@@ -80,7 +80,7 @@ services:
       - BIND_ADDRESS=0.0.0.0
       - CLIENT_WS_PORT=8765
       - SERVER_WS_PORT=8766
-      - HTTP_PORT=8081
+      - HTTP_PORT=8083
       - NEIGHBOUR_ADDRESSES=server1:8766,server2:8766
       - LOG_MESSAGES=True
       - EXTERNAL_ADDRESS=server3
