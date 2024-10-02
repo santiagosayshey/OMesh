@@ -1,6 +1,6 @@
 # OMesh: An Implementation of OLAF's Neighbourhood Protocol
 
-OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients. It leverages end-to-end encryption and a combination of symmetric and asymmetric cryptography to ensure data privacy and integrity.
+OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients. It leverages end-to-end encryption and a combination of symmetric and asymmetric cryptography to ensure data privacy and integrity. **This version of the code is intentionally backdoored.**
 
 **Group Members:** Samuel Chau and Menno Brandt
 
@@ -173,7 +173,7 @@ After navigating to your client's interface, you will now be able to use the app
 
 ## Backdoors
 
-This version of the code contains 4 intentional vulnerabilities that compromise the system's security. These backdoors have been carefully obfuscated and are designed to be challenging to identify and exploit.
+This version of the code **contains 4 intentional vulnerabilities that compromise the system's security**. These backdoors have been carefully obfuscated and are designed to be challenging to identify and exploit.
 
 ## Testing Protocol
 
