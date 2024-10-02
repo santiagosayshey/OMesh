@@ -7,6 +7,8 @@ from aiohttp import web
 import base64
 import os
 import time
+import re
+import uuid
 
 import logging
 
@@ -687,13 +689,25 @@ class Server:
         if not field or field.name != 'file':
             return web.json_response({'error': 'No file field in request'}, status=400)
         filename = field.filename
+        filename = sanitize_filename(filename)
+
+        if not filename:
+            return web.json_response({'error': 'Invalid filename'}, status=400)
+
+        # Generate a unique filename if the file already exists
+        filepath = os.path.join(FILES_DIR, filename)
+        if os.path.exists(filepath):
+            # Add a unique suffix to the filename
+            base, ext = os.path.splitext(filename)
+            unique_id = uuid.uuid4().hex[:8]  # Short unique id
+            filename = f"{base}_{unique_id}{ext}"
+            filepath = os.path.join(FILES_DIR, filename)
 
         # Set a maximum file size limit (e.g., 10 MB)
         max_file_size = 10 * 1024 * 1024
         size = 0
 
         # Save the file
-        filepath = os.path.join(FILES_DIR, filename)
         with open(filepath, 'wb') as f:
             while True:
                 chunk = await field.read_chunk()
@@ -705,8 +719,16 @@ class Server:
                     return web.json_response({'error': 'File size exceeds limit'}, status=413)
                 f.write(chunk)
 
-        file_url = f"http://{self.external_address}:{self.http_port}/files/{filename}"
+        # Use 'localhost' in file URL if TEST_MODE is True
+        if TEST_MODE:
+            host = 'localhost'
+        else:
+            host = self.external_address
+
+        file_url = f"http://{host}:{self.http_port}/files/{filename}"
         return web.json_response({'file_url': file_url})
+
+
 
     async def handle_file_download(self, request):
         filename = request.match_info['filename']
@@ -719,14 +741,21 @@ class Server:
         files = os.listdir(FILES_DIR)
         files.sort()  # Optionally sort the file list
 
+        # Use 'localhost' in file URLs if TEST_MODE is True
+        if TEST_MODE:
+            host = 'localhost'
+        else:
+            host = self.external_address
+
         # Build an HTML response
         html = "<html><body><h1>Uploaded Files</h1><ul>"
         for filename in files:
-            file_url = f"/files/{filename}"
+            file_url = f"http://{host}:{self.http_port}/files/{filename}"
             html += f'<li><a href="{file_url}">{filename}</a></li>'
         html += "</ul></body></html>"
 
         return web.Response(text=html, content_type='text/html')
+
     
     async def handle_root(self, request):
         # Return a funny message
@@ -815,6 +844,14 @@ def log_message(direction, message):
                 logger.info(f"Received message of type '{message_type}'")
         except json.JSONDecodeError:
             logger.info("Received non-JSON message")
+
+def sanitize_filename(filename):
+    # Remove any path components and keep only the basename
+    filename = os.path.basename(filename)
+    # Replace any non-alphanumeric characters with underscore
+    filename = re.sub(r'[^A-Za-z0-9._-]', '_', filename)
+    return filename
+
 
 # Entry point
 if __name__ == '__main__':

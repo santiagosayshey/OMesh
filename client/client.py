@@ -561,13 +561,22 @@ class Client:
             filename = file.filename
             file_path = os.path.join('uploads', filename)
             file.save(file_path)
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 client_instance.upload_and_share_file(file_path, recipients),
                 client_instance.loop
             )
-            return jsonify({'status': 'File uploaded and shared'})
+            try:
+                result = future.result(timeout=10)  # Wait for up to 10 seconds
+                if result is True:
+                    return jsonify({'status': 'File uploaded and shared'})
+                else:
+                    return jsonify({'error': result}), 500
+            except Exception as e:
+                logger.error(f"Error in uploading and sharing file: {e}")
+                return jsonify({'error': str(e)}), 500
         else:
             return jsonify({'error': 'No file provided'}), 400
+
 
     async def upload_file(self, file_path):
         url = f'http://{self.server_address}:{self.http_port}/api/upload'
@@ -581,13 +590,17 @@ class Client:
                         file_url = json_response.get('file_url')
                         return file_url
                     else:
-                        error_message = await resp.text()
+                        # Get the error message from the response
+                        json_response = await resp.json()
+                        error_message = json_response.get('error', 'Unknown error')
                         logger.error(f"File upload failed with status {resp.status}: {error_message}")
-                        return None
+                        # Raise an exception with the error message
+                        raise Exception(f"File upload failed: {error_message}")
+
 
     async def upload_and_share_file(self, file_path, recipients):
-        file_url = await self.upload_file(file_path)
-        if file_url:
+        try:
+            file_url = await self.upload_file(file_path)
             message_text = f"[File] {file_url}"
 
             # Send to global chat if 'global' is in recipients
@@ -598,8 +611,11 @@ class Client:
             private_recipients = [r for r in recipients if r != 'global']
             if private_recipients:
                 await self.send_chat_message(private_recipients, message_text)
-        else:
-            logger.error("Failed to upload and share file.")
+            return True  # Indicate success
+        except Exception as e:
+            logger.error(f"Failed to upload and share file: {e}")
+            return str(e)  # Return the error message
+
 
     async def send_chat_message(self, recipients, message_text):
         # Calculate sender's fingerprint
