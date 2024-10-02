@@ -1,6 +1,6 @@
 # OMesh: An Implementation of OLAF's Neighbourhood Protocol
 
-OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients.
+OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients. It leverages end-to-end encryption and a combination of symmetric and asymmetric cryptography to ensure data privacy and integrity.
 
 **Group Members:** Samuel Chau and Menno Brandt
 
@@ -8,7 +8,6 @@ OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilit
 
 ## Table of Contents
 
-- [General Description](#general-description)
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Usage](#usage)
@@ -21,12 +20,6 @@ OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilit
   - [Basic Docker Compose Commands](#basic-docker-compose-commands)
   - [Server Configuration](#server)
   - [Client Configuration](#client-environment-variables)
-
----
-
-## General Description
-
-OMesh implements OLAF's Neighbourhood protocol to enable secure, decentralized communication between users connected through a mesh network of servers. It leverages end-to-end encryption and a combination of symmetric and asymmetric cryptography to ensure data privacy and integrity.
 
 ---
 
