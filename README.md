@@ -30,7 +30,7 @@ OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilit
 - **Node.js and NPM**: For building the React frontend.
 - **Python 3.9**: Necessary for running test scripts outside Docker, if needed.
 
-**Note for Markers:** Please make sure you have docker compose 2.10+ installed. Python is necessary for testing purposes, but not for the main application. A standalone Python image is used in the docker containers.
+**Note for Markers:** Please make sure you have Docker Compose 2.10+ installed. Python is necessary for testing purposes, but not for the main application. A standalone Python image is used in the Docker containers.
 
 ---
 
@@ -40,10 +40,10 @@ Before proceeding, you need to clone the repo or download the ZIP file (already 
 
 1. Cloning the Repository (only if you haven't already downloaded the ZIP)
 
-```bash
-git clone https://github.com/santiagosayshey/OMesh.git
-cd OMesh
-```
+   ```bash
+   git clone https://github.com/santiagosayshey/OMesh.git
+   cd OMesh
+   ```
 
 2. Navigate to the frontend directory:
 
@@ -58,6 +58,7 @@ cd OMesh
    ```
 
 4. Return to the root directory:
+
    ```bash
    cd ..
    ```
