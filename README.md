@@ -435,41 +435,6 @@ networks:
 | `CLIENT_NAME`         | Unique identifier for the client, used ONLY for local identification.                                   | `my_client`      |
 | `MESSAGE_EXPIRY_TIME` | Controls message retention: `-1` (never delete), `0` (always delete), `>0` (keep for specified seconds) | `-1`             |
 
-## Testing Protocol
-
-To ensure the correctness and reliability of the OMesh implementation, we have developed a comprehensive testing protocol. This protocol covers various aspects of the system, including cryptographic operations, message structure compliance, and end-to-end functionality.
-
-### Overview of Testing Protocol
-
-Our testing protocol is designed to verify:
-
-1. Cryptographic Function Testing: Ensures all cryptographic operations (key generation, encryption/decryption, digital signatures) are implemented correctly.
-2. Message Structure Compliance Testing: Verifies that all messages adhere to the protocol's data structures and field requirements.
-3. End-to-End Testing: Checks the overall functionality of the system in various scenarios.
-
-### Accessing the Testing Protocol
-
-For a detailed explanation of our testing methodology and specific test cases, please refer to our [Testing Protocol Document](tests/README.md). This document provides in-depth information on:
-
-- Test case descriptions and objectives
-- Step-by-step procedures for each test
-- Expected and actual results
-- Guidelines for interpreting test outcomes
-
-### Running the Tests
-
-To run the automated tests for OMesh:
-
-1. Ensure you have set up the requirements described in the [Requirements](#requirements) section.
-2. Navigate to the project root directory.
-3. Run the testing script:
-
-```bash
-./run_tests.sh
-```
-
-### Interoperability Testing
-
-- TODO
+---
 
 # End of README
