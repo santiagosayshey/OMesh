@@ -1,76 +1,25 @@
 # OMesh: An Implementation of OLAF's Neighbourhood Protocol
 
-An open-source implementation of the OLAF's Neighbourhood protocol, developed using Python and React.
+OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients. It leverages end-to-end encryption and a combination of symmetric and asymmetric cryptography to ensure data privacy and integrity. **This version of the code is intentionally backdoored.**
 
 **Group Members:** Samuel Chau and Menno Brandt
-
-## Academic Integrity
-
-Under no circumstances is anyone allowed to copy any part of this repository for their own secure programming assignment. While this is _still_ an open-source project and you are free to view/download/modify it to your heart's content, students enrolled in secure programming must abide by academic integrity rules. You can use it to inspire or clarify something, but please don't copy anything for your assignment.
 
 ---
 
 ## Table of Contents
 
-- [General Description](#general-description)
-- [Technologies Used](#technologies-used)
-- [Protocol Overview](#protocol-overview)
-- [Implementation Details](#implementation-details)
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Usage](#usage)
+- [Backdoors](#backdoors)
 - [Testing Protocol](#testing-protocol)
 - [Appendix](#appendix)
+  - [Key Features and Implementation Details](#key-features-and-implementation-details)
+  - [Technologies Used](#technologies-used)
   - [Docker Compose Setup](#docker-compose-setup-for-omesh)
   - [Basic Docker Compose Commands](#basic-docker-compose-commands)
   - [Server Configuration](#server)
   - [Client Configuration](#client-environment-variables)
-
----
-
-## General Description
-
-OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilitate secure and decentralized messaging across a network of servers and clients.
-
-This project demonstrates key features such as client-to-client messaging, server-to-server communication, end-to-end encryption, and file transfers, all encapsulated within Docker containers for ease of deployment and testing.
-
----
-
-## Technologies Used
-
-- **Python 3.9**: Core language for server and client implementations.
-- **WebSockets (RFC 6455)**: For real-time communication between clients and servers.
-- **Flask**: A micro web framework for the client-side API.
-- **React**: For the frontend user interface.
-- **Vite**: A build tool for frontend assets, providing faster builds and optimized outputs.
-- **Docker & Docker Compose**: Containerization and orchestration of services.
-- **Cryptography Library**: For RSA and AES encryption implementations.
-- **aiohttp**: Asynchronous HTTP client/server framework.
-- **Asyncio**: For asynchronous programming in Python.
-
----
-
-## Protocol Overview and Implementation
-
-The OLAF's Neighbourhood protocol enables secure, decentralized communication:
-
-- **Users**: Identified by RSA key pairs and derived fingerprints.
-- **Servers**: Relay messages between clients and other servers.
-- **Neighbourhood**: A meshed network of interconnected servers.
-- **Messages**: JSON-formatted, UTF-8 encoded.
-
-Key features and implementation details:
-
-- **WebSocket Communication**: For real-time client-server and server-server data exchange.
-- **Neighbourhoods**: Manually define neighbourhoods by sharing public keys.
-- **Server Connection**: Servers send a `hello_server` message to establish websocket connection.
-- **Client Registration**: Clients send a `hello` message to establish identity.
-- **End-to-End Encryption**: Uses RSA for asymmetric and AES-GCM for symmetric encryption.
-- **Asynchronous Programming**: Utilizes Python's `asyncio` for non-blocking operations.
-- **File Transfers**: Via HTTP APIs.
-- **Replay Attack Prevention**: Messages include counters and signatures.
-- **Dockerized Services**: For easy deployment and scaling.
-- **React Frontend**: User interface programmed in React served by Vite.
 
 ---
 
