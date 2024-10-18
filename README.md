@@ -4,6 +4,8 @@ OMesh is an implementation of OLAF's Neighbourhood protocol, designed to facilit
 
 **Group Members:** Samuel Chau and Menno Brandt
 
+**Group: 26**
+
 ---
 
 ## Table of Contents
