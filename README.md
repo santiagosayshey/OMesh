@@ -178,7 +178,7 @@ After navigating to your client's interface, you will now be able to use the app
 
 ## Backdoors
 
-This version of the code **resolves the 4 intentional vulnerabilities included in the week 9 submission**. Please review the `/backdoors` folder for a comprehensive overview and proof of exploitation. They are best viewed on GitHub or some other markdown viewer.
+This version of the code **resolves the 4 intentional vulnerabilities included in the week 9 submission**. Please review the `/backdoors` folder for a comprehensive overview and proof of exploitation included as PDFs for each backdoor.
 
 ## Outgoing Peer Reviews
 
